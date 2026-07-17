@@ -10,6 +10,9 @@ class App extends BaseApp {
     public const POST_TYPE = 'tracked_flight';
     public const NONCE_ACTION = 'flight_log_save_flight';
     public const NONCE_NAME = 'flight_log_nonce';
+    private const REFERENCE_NAMES_OPTION = 'flight_log_reference_names';
+    private const AIRPORTS_CSV_URL = 'https://davidmegginson.github.io/ourairports-data/airports.csv';
+    private const AIRLINES_CSV_URL = 'https://raw.githubusercontent.com/jpatokal/openflights/master/data/airlines.dat';
 
     private const META_KEYS = [
         'flightnr',
@@ -143,6 +146,23 @@ class App extends BaseApp {
                 ],
             ],
         ] );
+        register_rest_route( 'flight-log/v1', '/reference-names', [
+            'methods'             => 'POST',
+            'callback'            => [ $this, 'rest_reference_names' ],
+            'permission_callback' => static function() {
+                return current_user_can( 'edit_posts' );
+            },
+            'args'                => [
+                'airport_codes' => [
+                    'required' => false,
+                    'type'     => 'array',
+                ],
+                'airline_codes' => [
+                    'required' => false,
+                    'type'     => 'array',
+                ],
+            ],
+        ] );
     }
 
     public function rest_import_legacy( \WP_REST_Request $request ) {
@@ -158,6 +178,20 @@ class App extends BaseApp {
         }
 
         return rest_ensure_response( $this->import_legacy_rows( $rows, (bool) $request->get_param( 'update_existing' ) ) );
+    }
+
+    public function rest_reference_names( \WP_REST_Request $request ) {
+        $result = $this->prime_reference_names(
+            (array) $request->get_param( 'airport_codes' ),
+            (array) $request->get_param( 'airline_codes' )
+        );
+
+        if ( is_wp_error( $result ) ) {
+            $result->add_data( [ 'status' => 502 ] );
+            return $result;
+        }
+
+        return rest_ensure_response( $result );
     }
 
     public function sanitize_meta_value( $value ) {
@@ -214,6 +248,7 @@ class App extends BaseApp {
         }
 
         $values = $this->normalize_submitted_values( $state['values'] );
+        $this->prime_reference_names_for_rows( [ $values ] );
         $post_id = 'edit' === $state['mode'] ? $this->find_flight_post_id( $state['original_flightnr'], $state['original_date'] ) : 0;
 
         if ( 'edit' === $state['mode'] && ! $post_id ) {
@@ -310,8 +345,8 @@ class App extends BaseApp {
             $flight['is_future'] = $flight['date_obj'] > $now;
             $flight['is_future'] ? $summary['planned']++ : $summary['logged']++;
 
-            $this->count( $summary['airports'], $flight['from'] );
-            $this->count( $summary['airports'], $flight['to'] );
+            $this->count( $summary['airports'], $flight['from_airport'] );
+            $this->count( $summary['airports'], $flight['to_airport'] );
             $this->count( $summary['airlines'], $flight['airline'] );
             $this->count( $summary['routes'], $flight['route_key'] );
             $this->count( $summary['aircraft'], $flight['regnr'] ?: $flight['aircraft'] ?: 'Unknown' );
@@ -465,6 +500,10 @@ class App extends BaseApp {
             'errors'  => [],
         ];
 
+        if ( ! $dry_run ) {
+            $this->prime_reference_names_for_rows( $rows );
+        }
+
         foreach ( $rows as $index => $row ) {
             $values = $this->legacy_row_to_values( $row );
             if ( ! $this->parse_datetime_local( $values['date'] ) ) {
@@ -526,6 +565,8 @@ class App extends BaseApp {
         $body_type = $this->body_type( $aircraft_type, $values['aircraft'] );
         $seat = $this->seat_info( $values['seat'], $body_type );
         $airline = $this->airline_name( $values['flightnr'] );
+        $from_airport = $this->airport_name( $values['from'] );
+        $to_airport = $this->airport_name( $values['to'] );
         $route = $values['route'] ?: $values['from'] . '-' . $values['to'];
 
         return array_merge( $values, [
@@ -538,6 +579,8 @@ class App extends BaseApp {
             'route_key'      => $values['from'] . '-' . $values['to'],
             'route_display'  => $route,
             'airline'        => $airline,
+            'from_airport'   => $from_airport,
+            'to_airport'     => $to_airport,
             'manufacturer'   => $manufacturer ?: 'Unknown',
             'aircraft_type'  => $aircraft_type,
             'body_type'      => $body_type,
@@ -638,7 +681,7 @@ class App extends BaseApp {
     private function assign_terms( int $post_id, array $flight ): void {
         $terms = [
             'flight_log_airline'       => [ $flight['airline'] ],
-            'flight_log_airport'       => array_filter( [ $flight['from'], $flight['to'] ] ),
+            'flight_log_airport'       => array_filter( [ $flight['from_airport'], $flight['to_airport'] ] ),
             'flight_log_route'         => [ $flight['route_key'] ],
             'flight_log_aircraft_type' => [ $flight['aircraft_type'] ],
             'flight_log_manufacturer'  => [ $flight['manufacturer'] ],
@@ -790,8 +833,173 @@ class App extends BaseApp {
         return $years ? "{$years}y" : "{$months}m";
     }
 
+    private function prime_reference_names_for_rows( array $rows ) {
+        $airport_codes = [];
+        $airline_codes = [];
+
+        foreach ( $rows as $row ) {
+            if ( ! is_array( $row ) ) {
+                continue;
+            }
+            foreach ( [ 'from', 'to' ] as $key ) {
+                if ( ! empty( $row[ $key ] ) ) {
+                    $airport_codes[] = (string) $row[ $key ];
+                }
+            }
+            if ( ! empty( $row['flightnr'] ) ) {
+                $airline_codes[] = substr( (string) $row['flightnr'], 0, 2 );
+            }
+        }
+
+        return $this->prime_reference_names( $airport_codes, $airline_codes );
+    }
+
+    private function prime_reference_names( array $airport_codes, array $airline_codes ) {
+        $cache = $this->reference_names();
+        $airport_codes = $this->missing_reference_codes( $airport_codes, $cache['airports'] );
+        $airline_codes = $this->missing_reference_codes( $airline_codes, $cache['airlines'] );
+
+        if ( $airport_codes ) {
+            $airport_names = $this->download_airport_names( $airport_codes );
+            if ( is_wp_error( $airport_names ) ) {
+                return $airport_names;
+            }
+            foreach ( $airport_codes as $code ) {
+                if ( ! isset( $airport_names[ $code ] ) ) {
+                    $airport_names[ $code ] = $code;
+                }
+            }
+            $cache['airports'] = array_merge( $cache['airports'], $airport_names );
+        }
+
+        if ( $airline_codes ) {
+            $airline_names = $this->download_airline_names( $airline_codes );
+            if ( is_wp_error( $airline_names ) ) {
+                return $airline_names;
+            }
+            foreach ( $airline_codes as $code ) {
+                if ( ! isset( $airline_names[ $code ] ) ) {
+                    $airline_names[ $code ] = $this->fallback_airline_name( $code );
+                }
+            }
+            $cache['airlines'] = array_merge( $cache['airlines'], $airline_names );
+        }
+
+        update_option( self::REFERENCE_NAMES_OPTION, $cache, false );
+
+        return [
+            'airports' => $this->reference_subset( $cache['airports'], $airport_codes ),
+            'airlines' => $this->reference_subset( $cache['airlines'], $airline_codes ),
+        ];
+    }
+
+    private function reference_names(): array {
+        $cache = get_option( self::REFERENCE_NAMES_OPTION, [] );
+
+        return [
+            'airports' => isset( $cache['airports'] ) && is_array( $cache['airports'] ) ? $cache['airports'] : [],
+            'airlines' => isset( $cache['airlines'] ) && is_array( $cache['airlines'] ) ? $cache['airlines'] : [],
+        ];
+    }
+
+    private function missing_reference_codes( array $codes, array $known ): array {
+        $codes = array_unique( array_filter( array_map( static function( $code ) {
+            return strtoupper( trim( (string) $code ) );
+        }, $codes ) ) );
+
+        return array_values( array_filter( $codes, static function( string $code ) use ( $known ): bool {
+            return ! isset( $known[ $code ] );
+        } ) );
+    }
+
+    private function reference_subset( array $names, array $codes ): array {
+        $subset = [];
+        foreach ( $codes as $code ) {
+            if ( isset( $names[ $code ] ) ) {
+                $subset[ $code ] = $names[ $code ];
+            }
+        }
+        return $subset;
+    }
+
+    private function download_airport_names( array $codes ) {
+        $response = wp_remote_get( self::AIRPORTS_CSV_URL, [ 'timeout' => 20 ] );
+        if ( is_wp_error( $response ) ) {
+            return $response;
+        }
+        if ( 200 !== wp_remote_retrieve_response_code( $response ) ) {
+            return new \WP_Error( 'flight_log_airports_download_failed', 'Could not download airport names.' );
+        }
+
+        $body = wp_remote_retrieve_body( $response );
+        $lines = preg_split( '/\R/', $body );
+        $header = str_getcsv( (string) array_shift( $lines ) );
+        $columns = array_flip( $header );
+        $names = [];
+        $wanted = array_flip( $codes );
+
+        foreach ( $lines as $line ) {
+            if ( '' === trim( $line ) ) {
+                continue;
+            }
+
+            $row = str_getcsv( $line );
+            foreach ( [ 'iata_code', 'icao_code', 'ident', 'gps_code', 'local_code' ] as $column ) {
+                $code = strtoupper( trim( (string) ( $row[ $columns[ $column ] ?? -1 ] ?? '' ) ) );
+                if ( '' !== $code && isset( $wanted[ $code ] ) && ! isset( $names[ $code ] ) ) {
+                    $name = (string) ( $row[ $columns['name'] ?? -1 ] ?? '' );
+                    $names[ $code ] = trim( $code . ' - ' . $name );
+                }
+            }
+        }
+
+        return $names;
+    }
+
+    private function download_airline_names( array $codes ) {
+        $response = wp_remote_get( self::AIRLINES_CSV_URL, [ 'timeout' => 20 ] );
+        if ( is_wp_error( $response ) ) {
+            return $response;
+        }
+        if ( 200 !== wp_remote_retrieve_response_code( $response ) ) {
+            return new \WP_Error( 'flight_log_airlines_download_failed', 'Could not download airline names.' );
+        }
+
+        $names = [];
+        $wanted = array_flip( $codes );
+        foreach ( preg_split( '/\R/', wp_remote_retrieve_body( $response ) ) as $line ) {
+            if ( '' === trim( $line ) ) {
+                continue;
+            }
+
+            $row = str_getcsv( $line );
+            $code = strtoupper( trim( (string) ( $row[3] ?? '' ) ) );
+            if ( '' !== $code && isset( $wanted[ $code ] ) && ! isset( $names[ $code ] ) ) {
+                $names[ $code ] = (string) ( $row[1] ?? $code );
+            }
+        }
+
+        return $names;
+    }
+
+    private function airport_name( string $code ): string {
+        $code = strtoupper( trim( $code ) );
+        $cache = $this->reference_names();
+        return $cache['airports'][ $code ] ?? ( $code ?: 'Unknown' );
+    }
+
     private function airline_name( string $flightnr ): string {
         $code = strtoupper( substr( $flightnr, 0, 2 ) );
+        $cache = $this->reference_names();
+        if ( isset( $cache['airlines'][ $code ] ) ) {
+            return $cache['airlines'][ $code ];
+        }
+
+        return $this->fallback_airline_name( $code );
+    }
+
+    private function fallback_airline_name( string $code ): string {
+        $code = strtoupper( trim( $code ) );
         $airlines = [
             'OS' => 'Austrian Airlines',
             'BA' => 'British Airways',

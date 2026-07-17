@@ -82,6 +82,9 @@ $render_count_list = static function( string $title, array $counts, string $filt
         .field-wide { grid-column: span 2; }
         .field-remarks { grid-column: span 6; }
         .import-panel { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px; }
+        .import-panel summary { color: var(--accent); cursor: pointer; font-weight: 800; }
+        .import-panel summary:focus { outline: 0; text-decoration: underline; }
+        .import-panel-body { margin-top: 12px; }
         .import-panel textarea { min-height: 130px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
         .import-source-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .import-status { margin-top: 10px; color: var(--muted); font-weight: 700; }
@@ -183,25 +186,30 @@ $render_count_list = static function( string $title, array $counts, string $filt
             <div class="field"><label for="msn">MSN</label><input id="msn" name="msn" type="number" min="0" value="<?php echo esc_attr( $values['msn'] ); ?>"></div>
             <div class="field field-remarks"><label for="remarks">Remarks</label><textarea id="remarks" name="remarks"><?php echo esc_textarea( $values['remarks'] ); ?></textarea></div>
         </div>
-        <div class="import-panel">
-            <div class="import-source-grid">
-                <div class="field">
-                    <label for="legacy_import_file">Import file</label>
-                    <input id="legacy_import_file" name="legacy_import_file" type="file" accept=".json,.ndjson,application/json">
+        <details class="import-panel">
+            <summary>Import flights</summary>
+            <div class="import-panel-body">
+                <div class="import-source-grid">
+                    <div class="field">
+                        <label for="legacy_import_file">Import file</label>
+                        <input id="legacy_import_file" name="legacy_import_file" type="file" accept=".json,.ndjson,application/json">
+                    </div>
+                    <div class="field">
+                        <label for="legacy_import_json">Import flights</label>
+                        <textarea id="legacy_import_json" name="legacy_import_json" placeholder="Paste phpMyAdmin JSON export, a JSON array, or newline-delimited JSON rows"></textarea>
+                    </div>
                 </div>
-                <div class="field">
-                    <label for="legacy_import_json">Import flights</label>
-                    <textarea id="legacy_import_json" name="legacy_import_json" placeholder="Paste phpMyAdmin JSON export, a JSON array, or newline-delimited JSON rows"></textarea>
+                <div class="field checkbox-field">
+                    <input id="update_existing" name="update_existing" type="checkbox" value="1">
+                    <label for="update_existing">Update existing flights</label>
+                </div>
+                <div class="import-status" id="legacy-import-status" role="status" aria-live="polite"></div>
+                <div class="form-actions">
+                    <button type="button" class="button secondary" id="legacy-import-submit">Import flights</button>
                 </div>
             </div>
-            <div class="field checkbox-field">
-                <input id="update_existing" name="update_existing" type="checkbox" value="1">
-                <label for="update_existing">Update existing flights</label>
-            </div>
-            <div class="import-status" id="legacy-import-status" role="status" aria-live="polite"></div>
-        </div>
+        </details>
         <div class="form-actions">
-            <button type="button" class="button secondary" id="legacy-import-submit">Import flights</button>
             <button type="submit" class="button" id="flight-submit"><?php echo esc_html( 'edit' === $form['mode'] ? 'Save changes' : 'Add flight' ); ?></button>
         </div>
     </form>
@@ -257,8 +265,9 @@ $render_count_list = static function( string $title, array $counts, string $filt
 <script>
 const flights = <?php echo wp_json_encode( $json_flights ); ?>;
 const importConfig = <?php echo wp_json_encode( [
-    'endpoint' => esc_url_raw( rest_url( 'flight-log/v1/import-legacy' ) ),
-    'nonce'    => wp_create_nonce( 'wp_rest' ),
+    'endpoint'          => esc_url_raw( rest_url( 'flight-log/v1/import-legacy' ) ),
+    'referenceEndpoint' => esc_url_raw( rest_url( 'flight-log/v1/reference-names' ) ),
+    'nonce'             => wp_create_nonce( 'wp_rest' ),
 ] ); ?>;
 let activeFilter = null;
 const rows = document.getElementById('flight-rows');
@@ -310,9 +319,15 @@ function editFlight(flight) {
 
 function matches(flight) {
     const q = search.value.trim().toLowerCase();
-    if (activeFilter && text(flight[activeFilter.key]) !== activeFilter.value) return false;
+    if (activeFilter) {
+        if (activeFilter.key === 'airport') {
+            if (![flight.from_airport, flight.to_airport, flight.from, flight.to].map(text).includes(activeFilter.value)) return false;
+        } else if (text(flight[activeFilter.key]) !== activeFilter.value) {
+            return false;
+        }
+    }
     if (!q) return true;
-    return ['date_display', 'from', 'to', 'route_display', 'flightnr', 'regnr', 'airline', 'aircraft', 'seat', 'remarks'].some((key) => text(flight[key]).toLowerCase().includes(q));
+    return ['date_display', 'from', 'to', 'from_airport', 'to_airport', 'route_display', 'flightnr', 'regnr', 'airline', 'aircraft', 'seat', 'remarks'].some((key) => text(flight[key]).toLowerCase().includes(q));
 }
 
 function renderRows() {
@@ -414,6 +429,33 @@ async function getImportInput() {
     return importTextarea.value;
 }
 
+async function primeReferenceNames(importRows) {
+    const airportCodes = new Set();
+    const airlineCodes = new Set();
+    importRows.forEach((row) => {
+        if (row.from) airportCodes.add(String(row.from).trim().toUpperCase());
+        if (row.to) airportCodes.add(String(row.to).trim().toUpperCase());
+        if (row.flightnr) airlineCodes.add(String(row.flightnr).trim().slice(0, 2).toUpperCase());
+    });
+
+    const response = await fetch(importConfig.referenceEndpoint, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-WP-Nonce': importConfig.nonce
+        },
+        body: JSON.stringify({
+            airport_codes: Array.from(airportCodes),
+            airline_codes: Array.from(airlineCodes)
+        })
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+        throw new Error(payload.message || 'Could not download airport or airline names.');
+    }
+}
+
 importButton.addEventListener('click', async () => {
     const chunkSize = 25;
     let importRows;
@@ -426,12 +468,19 @@ importButton.addEventListener('click', async () => {
 
     importButton.disabled = true;
     importButton.textContent = 'Importing...';
-    setImportStatus(`Importing 0 of ${importRows.length} flights...`);
+    setImportStatus('Downloading names for used airports and airlines...');
 
     const totals = { created: 0, updated: 0, skipped: 0 };
     const errors = [];
 
     try {
+        try {
+            await primeReferenceNames(importRows);
+        } catch (error) {
+            setImportStatus(`${error.message} Importing with airport and airline codes...`, true);
+        }
+        setImportStatus(`Importing 0 of ${importRows.length} flights...`);
+
         for (let offset = 0; offset < importRows.length; offset += chunkSize) {
             const chunk = importRows.slice(offset, offset + chunkSize);
             const response = await fetch(importConfig.endpoint, {
