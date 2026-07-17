@@ -1,6 +1,6 @@
 {
     "name": "flight-tracker/flight-tracker",
-    "description": "Flight Tracker - A WordPress app powered by WpApp",
+    "description": "A private flight log and statistics app for WordPress.",
     "type": "wordpress-plugin",
     "license": "GPL-2.0-or-later",
     "require": {

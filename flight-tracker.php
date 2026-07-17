@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: Flight Tracker
- * Description: A WordPress app powered by WpApp.
+ * Description: A private flight log and statistics app for WordPress.
  * Version: 1.0.0
  * Author: Alex Kirk
  * Text Domain: flight-tracker
