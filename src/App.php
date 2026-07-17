@@ -731,14 +731,54 @@ class App extends BaseApp {
     }
 
     private function parse_datetime_local( string $value ): ?DateTime {
-        $format = strlen( $value ) > 16 ? 'Y-m-d\TH:i:s' : 'Y-m-d\TH:i';
-        if ( false === strpos( $value, 'T' ) ) {
-            $format = 'Y-m-d H:i:s';
+        $value = trim( $value );
+        if ( '' === $value ) {
+            return null;
         }
-        $date = DateTime::createFromFormat( $format, $value );
-        $date_errors = DateTime::getLastErrors();
 
-        return $date && ! ( $date_errors && ( $date_errors['warning_count'] || $date_errors['error_count'] ) ) ? $date : null;
+        foreach ( [ 'Y-m-d\TH:i:s', 'Y-m-d\TH:i', 'Y-m-d H:i:s', 'Y-m-d H:i', 'Y-m-d' ] as $format ) {
+            $date = DateTime::createFromFormat( $format, $value );
+            $date_errors = DateTime::getLastErrors();
+            if ( $date && ! ( $date_errors && ( $date_errors['warning_count'] || $date_errors['error_count'] ) ) ) {
+                if ( in_array( $format, [ 'Y-m-d' ], true ) ) {
+                    $date->setTime( 12, 0 );
+                }
+                return $date;
+            }
+        }
+
+        $normalized = preg_replace( '/\s+/', ' ', strtolower( $value ) );
+        $normalized = preg_replace( '/\b(tdy|tod)\b/', 'today', $normalized );
+        $normalized = preg_replace( '/\b(tmr|tmrw|tom)\b/', 'tomorrow', $normalized );
+        $normalized = preg_replace_callback( '/(^|\s)(\d{1,2})(\d{2})(?=$|\s)/', static function( array $matches ): string {
+            $hour = (int) $matches[2];
+            $minute = (int) $matches[3];
+            if ( $hour > 23 || $minute > 59 ) {
+                return $matches[0];
+            }
+            return $matches[1] . sprintf( '%02d:%02d', $hour, $minute );
+        }, $normalized );
+        $normalized = preg_replace_callback( '/(^|\s)(\d{1,2})(?=$|\s)/', static function( array $matches ): string {
+            $hour = (int) $matches[2];
+            if ( $hour > 23 ) {
+                return $matches[0];
+            }
+            return $matches[1] . sprintf( '%02d:00', $hour );
+        }, $normalized );
+        $normalized = preg_replace( '/\b(\d{1,2})\.(\d{1,2})\.(\d{2})(?=\D|$)/', '$1.$2.20$3', $normalized );
+
+        $timestamp = strtotime( $normalized );
+        if ( false === $timestamp ) {
+            return null;
+        }
+
+        $date = new DateTime();
+        $date->setTimestamp( $timestamp );
+        if ( ! preg_match( '/\d{1,2}:\d{2}/', $normalized ) ) {
+            $date->setTime( 12, 0 );
+        }
+
+        return $date;
     }
 
     private function format_title( array $flight ): string {

@@ -18,9 +18,9 @@ $json_flights = array_map(
     $flights
 );
 
-$render_count_list = static function( string $title, array $counts, string $filter_key ): void {
+$render_count_list = static function( string $title, array $counts, string $filter_key, string $id = '' ): void {
     ?>
-    <section class="panel summary-panel">
+    <section class="panel summary-panel"<?php echo $id ? ' id="' . esc_attr( $id ) . '"' : ''; ?>>
         <h2><?php echo esc_html( $title ); ?></h2>
         <div class="count-list">
             <?php foreach ( array_slice( $counts, 0, 12, true ) as $name => $count ) : ?>
@@ -98,6 +98,8 @@ $render_count_list = static function( string $title, array $counts, string $filt
         .form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
         .overview { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
         .stat { border: 1px solid var(--border); border-radius: 8px; background: var(--surface); padding: 13px; }
+        .stat-button { width: 100%; color: inherit; cursor: pointer; text-align: left; }
+        .stat-button:hover, .stat-button:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(15, 118, 110, .16); outline: 0; }
         .stat span { display: block; color: var(--muted); font-size: 12px; font-weight: 800; text-transform: uppercase; }
         .stat strong { display: block; margin-top: 5px; font-size: 24px; line-height: 1.1; }
         .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 14px; }
@@ -177,7 +179,7 @@ $render_count_list = static function( string $title, array $counts, string $filt
             <button type="button" class="button secondary" id="flight-form-close">Close</button>
         </div>
         <div class="form-grid">
-            <div class="field field-wide"><label for="flight_date">Date and time</label><input id="flight_date" name="date" type="datetime-local" step="1" required value="<?php echo esc_attr( str_replace( ' ', 'T', $values['date'] ) ); ?>"></div>
+            <div class="field field-wide"><label for="flight_date">Date and time</label><input id="flight_date" name="date" type="text" required placeholder="today 9:30, 17.7.26 930, 2026-07-17 09:30" value="<?php echo esc_attr( $values['date'] ); ?>"></div>
             <div class="field"><label for="flightnr">Flight #</label><input id="flightnr" name="flightnr" maxlength="8" required value="<?php echo esc_attr( $values['flightnr'] ); ?>"></div>
             <div class="field"><label for="from">From</label><input id="from" name="from" maxlength="10" required value="<?php echo esc_attr( $values['from'] ); ?>"></div>
             <div class="field"><label for="to">To</label><input id="to" name="to" maxlength="10" required value="<?php echo esc_attr( $values['to'] ); ?>"></div>
@@ -219,7 +221,7 @@ $render_count_list = static function( string $title, array $counts, string $filt
 
     <section class="overview">
         <div class="stat"><span>Logged flights</span><strong><?php echo esc_html( (string) $summary['logged'] ); ?></strong></div>
-        <div class="stat"><span>Airports</span><strong><?php echo esc_html( (string) count( $summary['airports'] ) ); ?></strong></div>
+        <button type="button" class="stat stat-button" id="airport-filter-open"><span>Airports</span><strong><?php echo esc_html( (string) count( $summary['airports'] ) ); ?></strong></button>
         <div class="stat"><span>Routes</span><strong><?php echo esc_html( (string) count( $summary['routes'] ) ); ?></strong></div>
         <div class="stat"><span>Aircraft</span><strong><?php echo esc_html( (string) count( $summary['aircraft'] ) ); ?></strong></div>
     </section>
@@ -230,11 +232,11 @@ $render_count_list = static function( string $title, array $counts, string $filt
         <span class="active-filter" id="active-filter"></span>
     </div>
 
-    <details class="filter-panel">
+    <details class="filter-panel" id="filter-panel">
         <summary>Filters</summary>
         <section class="summary-grid">
             <?php $render_count_list( 'Airlines', $summary['airlines'], 'airline' ); ?>
-            <?php $render_count_list( 'Airports', $summary['airports'], 'airport' ); ?>
+            <?php $render_count_list( 'Airports', $summary['airports'], 'airport', 'airport-filter-panel' ); ?>
             <?php $render_count_list( 'Routes', $summary['routes'], 'route_key' ); ?>
             <?php $render_count_list( 'Aircraft types', $summary['types'], 'aircraft_type' ); ?>
             <?php $render_count_list( 'Body types', $summary['body_types'], 'body_type' ); ?>
@@ -281,6 +283,9 @@ const search = document.getElementById('flight-search');
 const activeFilterLabel = document.getElementById('active-filter');
 const form = document.getElementById('flight-form');
 const toggle = document.getElementById('add-flight-toggle');
+const filterPanel = document.getElementById('filter-panel');
+const airportFilterOpen = document.getElementById('airport-filter-open');
+const airportFilterPanel = document.getElementById('airport-filter-panel');
 const importFile = document.getElementById('legacy_import_file');
 const importTextarea = document.getElementById('legacy_import_json');
 const importButton = document.getElementById('legacy-import-submit');
@@ -314,7 +319,7 @@ function clearForm() {
 function editFlight(flight) {
     fields.forEach((field) => {
         const input = document.getElementById(field === 'date' ? 'flight_date' : field);
-        if (input) input.value = field === 'date' ? flight.date_local : text(flight[field]);
+        if (input) input.value = field === 'date' ? flight.date_display : text(flight[field]);
     });
     document.getElementById('original_flightnr').value = flight.flightnr;
     document.getElementById('original_date').value = flight.date;
@@ -379,6 +384,10 @@ toggle.addEventListener('click', () => {
 document.getElementById('flight-form-close').addEventListener('click', () => {
     clearForm();
     setFormOpen(false);
+});
+airportFilterOpen.addEventListener('click', () => {
+    filterPanel.open = true;
+    airportFilterPanel.scrollIntoView({block: 'nearest', behavior: 'smooth'});
 });
 
 function parseImportRows(input) {
