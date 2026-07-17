@@ -103,7 +103,10 @@ $render_count_list = static function( string $title, array $counts, string $filt
         .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 14px; }
         .toolbar input { flex: 1 1 260px; max-width: 420px; }
         .active-filter { color: var(--muted); font-weight: 800; }
-        .summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+        .filter-panel { margin-bottom: 14px; }
+        .filter-panel summary { color: var(--accent); cursor: pointer; font-weight: 800; }
+        .filter-panel summary:focus { outline: 0; text-decoration: underline; }
+        .summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
         .panel { border: 1px solid var(--border); border-radius: 8px; background: var(--surface); padding: 13px; min-width: 0; }
         .count-list { display: grid; gap: 4px; }
         .count-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; width: 100%; border: 0; border-radius: 5px; background: transparent; color: var(--text); cursor: pointer; padding: 6px 7px; text-align: left; }
@@ -186,6 +189,9 @@ $render_count_list = static function( string $title, array $counts, string $filt
             <div class="field"><label for="msn">MSN</label><input id="msn" name="msn" type="number" min="0" value="<?php echo esc_attr( $values['msn'] ); ?>"></div>
             <div class="field field-remarks"><label for="remarks">Remarks</label><textarea id="remarks" name="remarks"><?php echo esc_textarea( $values['remarks'] ); ?></textarea></div>
         </div>
+        <div class="form-actions">
+            <button type="submit" class="button" id="flight-submit"><?php echo esc_html( 'edit' === $form['mode'] ? 'Save changes' : 'Add flight' ); ?></button>
+        </div>
         <details class="import-panel">
             <summary>Import flights</summary>
             <div class="import-panel-body">
@@ -209,9 +215,6 @@ $render_count_list = static function( string $title, array $counts, string $filt
                 </div>
             </div>
         </details>
-        <div class="form-actions">
-            <button type="submit" class="button" id="flight-submit"><?php echo esc_html( 'edit' === $form['mode'] ? 'Save changes' : 'Add flight' ); ?></button>
-        </div>
     </form>
 
     <section class="overview">
@@ -227,14 +230,17 @@ $render_count_list = static function( string $title, array $counts, string $filt
         <span class="active-filter" id="active-filter"></span>
     </div>
 
-    <section class="summary-grid">
-        <?php $render_count_list( 'Airlines', $summary['airlines'], 'airline' ); ?>
-        <?php $render_count_list( 'Airports', $summary['airports'], 'airport' ); ?>
-        <?php $render_count_list( 'Routes', $summary['routes'], 'route_key' ); ?>
-        <?php $render_count_list( 'Aircraft types', $summary['types'], 'aircraft_type' ); ?>
-        <?php $render_count_list( 'Body types', $summary['body_types'], 'body_type' ); ?>
-        <?php $render_count_list( 'Years', $summary['years'], 'year' ); ?>
-    </section>
+    <details class="filter-panel">
+        <summary>Filters</summary>
+        <section class="summary-grid">
+            <?php $render_count_list( 'Airlines', $summary['airlines'], 'airline' ); ?>
+            <?php $render_count_list( 'Airports', $summary['airports'], 'airport' ); ?>
+            <?php $render_count_list( 'Routes', $summary['routes'], 'route_key' ); ?>
+            <?php $render_count_list( 'Aircraft types', $summary['types'], 'aircraft_type' ); ?>
+            <?php $render_count_list( 'Body types', $summary['body_types'], 'body_type' ); ?>
+            <?php $render_count_list( 'Years', $summary['years'], 'year' ); ?>
+        </section>
+    </details>
 
     <section class="table-panel">
         <div class="table-scroll">
