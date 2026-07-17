@@ -51,6 +51,7 @@ class App extends BaseApp {
         add_action( 'init', [ $this, 'register_post_types' ] );
         add_action( 'init', [ $this, 'register_taxonomies' ] );
         add_action( 'init', [ $this, 'register_meta' ] );
+        add_action( 'rest_api_init', [ $this, 'register_rest_routes' ] );
 
         if ( defined( 'WP_CLI' ) && WP_CLI ) {
             \WP_CLI::add_command( 'flight-log import-legacy', [ $this, 'cli_import_legacy' ] );
@@ -122,6 +123,41 @@ class App extends BaseApp {
                 },
             ] );
         }
+    }
+
+    public function register_rest_routes(): void {
+        register_rest_route( 'flight-log/v1', '/import-legacy', [
+            'methods'             => 'POST',
+            'callback'            => [ $this, 'rest_import_legacy' ],
+            'permission_callback' => static function() {
+                return current_user_can( 'edit_posts' );
+            },
+            'args'                => [
+                'rows'            => [
+                    'required' => true,
+                    'type'     => 'array',
+                ],
+                'update_existing' => [
+                    'required' => false,
+                    'type'     => 'boolean',
+                ],
+            ],
+        ] );
+    }
+
+    public function rest_import_legacy( \WP_REST_Request $request ) {
+        $rows = $request->get_param( 'rows' );
+        if ( ! is_array( $rows ) ) {
+            return new \WP_Error( 'flight_log_invalid_import_rows', 'Import rows must be an array.', [ 'status' => 400 ] );
+        }
+
+        $rows = $this->normalize_import_rows( $rows );
+        if ( is_wp_error( $rows ) ) {
+            $rows->add_data( [ 'status' => 400 ] );
+            return $rows;
+        }
+
+        return rest_ensure_response( $this->import_legacy_rows( $rows, (bool) $request->get_param( 'update_existing' ) ) );
     }
 
     public function sanitize_meta_value( $value ) {

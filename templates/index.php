@@ -83,6 +83,8 @@ $render_count_list = static function( string $title, array $counts, string $filt
         .field-remarks { grid-column: span 6; }
         .import-panel { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px; }
         .import-panel textarea { min-height: 130px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+        .import-source-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .import-status { margin-top: 10px; color: var(--muted); font-weight: 700; }
         .checkbox-field { align-items: center; flex-direction: row; gap: 8px; margin-top: 10px; }
         .checkbox-field input { width: auto; }
         .checkbox-field label { color: var(--text); font-size: 13px; font-weight: 700; text-transform: none; }
@@ -121,6 +123,7 @@ $render_count_list = static function( string $title, array $counts, string $filt
             .overview, .summary-grid { grid-template-columns: 1fr 1fr; }
             .form-grid { grid-template-columns: 1fr; }
             .field-wide, .field-remarks { grid-column: span 1; }
+            .import-source-grid { grid-template-columns: 1fr; }
         }
         @media (max-width: 620px) {
             .overview, .summary-grid { grid-template-columns: 1fr; }
@@ -181,14 +184,21 @@ $render_count_list = static function( string $title, array $counts, string $filt
             <div class="field field-remarks"><label for="remarks">Remarks</label><textarea id="remarks" name="remarks"><?php echo esc_textarea( $values['remarks'] ); ?></textarea></div>
         </div>
         <div class="import-panel">
-            <div class="field">
-                <label for="legacy_import_json">Import flights</label>
-                <textarea id="legacy_import_json" name="legacy_import_json" placeholder="Paste phpMyAdmin JSON export, a JSON array, or newline-delimited JSON rows"></textarea>
+            <div class="import-source-grid">
+                <div class="field">
+                    <label for="legacy_import_file">Import file</label>
+                    <input id="legacy_import_file" name="legacy_import_file" type="file" accept=".json,.ndjson,application/json">
+                </div>
+                <div class="field">
+                    <label for="legacy_import_json">Import flights</label>
+                    <textarea id="legacy_import_json" name="legacy_import_json" placeholder="Paste phpMyAdmin JSON export, a JSON array, or newline-delimited JSON rows"></textarea>
+                </div>
             </div>
             <div class="field checkbox-field">
                 <input id="update_existing" name="update_existing" type="checkbox" value="1">
                 <label for="update_existing">Update existing flights</label>
             </div>
+            <div class="import-status" id="legacy-import-status" role="status" aria-live="polite"></div>
         </div>
         <div class="form-actions">
             <button type="button" class="button secondary" id="legacy-import-submit">Import flights</button>
@@ -246,12 +256,20 @@ $render_count_list = static function( string $title, array $counts, string $filt
 </main>
 <script>
 const flights = <?php echo wp_json_encode( $json_flights ); ?>;
+const importConfig = <?php echo wp_json_encode( [
+    'endpoint' => esc_url_raw( rest_url( 'flight-log/v1/import-legacy' ) ),
+    'nonce'    => wp_create_nonce( 'wp_rest' ),
+] ); ?>;
 let activeFilter = null;
 const rows = document.getElementById('flight-rows');
 const search = document.getElementById('flight-search');
 const activeFilterLabel = document.getElementById('active-filter');
 const form = document.getElementById('flight-form');
 const toggle = document.getElementById('add-flight-toggle');
+const importFile = document.getElementById('legacy_import_file');
+const importTextarea = document.getElementById('legacy_import_json');
+const importButton = document.getElementById('legacy-import-submit');
+const importStatus = document.getElementById('legacy-import-status');
 const fields = ['date', 'flightnr', 'from', 'to', 'route', 'regnr', 'aircraft', 'seat', 'first_flight', 'msn', 'remarks'];
 
 function text(value) {
@@ -341,10 +359,123 @@ document.getElementById('flight-form-close').addEventListener('click', () => {
     clearForm();
     setFormOpen(false);
 });
-document.getElementById('legacy-import-submit').addEventListener('click', () => {
-    document.getElementById('flight_action').value = 'import_flights';
-    form.noValidate = true;
-    form.submit();
+
+function parseImportRows(input) {
+    const trimmed = input.trim();
+    if (!trimmed) throw new Error('No import data received.');
+
+    let parsed;
+    try {
+        parsed = JSON.parse(trimmed);
+    } catch (error) {
+        parsed = trimmed.split(/\r?\n/).filter((line) => line.trim()).map((line, index) => {
+            try {
+                return JSON.parse(line);
+            } catch (lineError) {
+                throw new Error(`Invalid JSON on input line ${index + 1}.`);
+            }
+        });
+    }
+
+    if (Array.isArray(parsed) && parsed[0]?.type === 'header') {
+        const table = parsed.find((entry) => entry?.type === 'table' && entry?.name === 'flights' && Array.isArray(entry.data));
+        if (!table) throw new Error('Could not find the flights table data in the phpMyAdmin JSON export.');
+        parsed = table.data;
+    }
+
+    if (parsed && !Array.isArray(parsed) && parsed.date && parsed.flightnr) {
+        parsed = [parsed];
+    }
+
+    if (!Array.isArray(parsed)) throw new Error('Import data must be a JSON array or newline-delimited JSON rows.');
+    parsed.forEach((row, index) => {
+        if (!row || typeof row !== 'object' || Array.isArray(row)) {
+            throw new Error(`Import row ${index + 1} is not an object.`);
+        }
+        ['date', 'flightnr', 'from', 'to'].forEach((key) => {
+            if (!Object.prototype.hasOwnProperty.call(row, key) || row[key] === '') {
+                throw new Error(`Import row ${index + 1} is missing ${key}.`);
+            }
+        });
+    });
+
+    return parsed;
+}
+
+function setImportStatus(message, isError = false) {
+    importStatus.textContent = message;
+    importStatus.style.color = isError ? 'var(--danger)' : 'var(--muted)';
+}
+
+async function getImportInput() {
+    if (importFile.files.length) {
+        return importFile.files[0].text();
+    }
+    return importTextarea.value;
+}
+
+importButton.addEventListener('click', async () => {
+    const chunkSize = 25;
+    let importRows;
+    try {
+        importRows = parseImportRows(await getImportInput());
+    } catch (error) {
+        setImportStatus(error.message, true);
+        return;
+    }
+
+    importButton.disabled = true;
+    importButton.textContent = 'Importing...';
+    setImportStatus(`Importing 0 of ${importRows.length} flights...`);
+
+    const totals = { created: 0, updated: 0, skipped: 0 };
+    const errors = [];
+
+    try {
+        for (let offset = 0; offset < importRows.length; offset += chunkSize) {
+            const chunk = importRows.slice(offset, offset + chunkSize);
+            const response = await fetch(importConfig.endpoint, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-WP-Nonce': importConfig.nonce
+                },
+                body: JSON.stringify({
+                    rows: chunk,
+                    update_existing: document.getElementById('update_existing').checked
+                })
+            });
+            const payload = await response.json();
+            if (!response.ok) {
+                throw new Error(payload.message || 'Import request failed.');
+            }
+
+            totals.created += payload.created || 0;
+            totals.updated += payload.updated || 0;
+            totals.skipped += payload.skipped || 0;
+            if (Array.isArray(payload.errors)) errors.push(...payload.errors);
+            setImportStatus(`Importing ${Math.min(offset + chunk.length, importRows.length)} of ${importRows.length} flights...`);
+        }
+
+        if (errors.length) {
+            setImportStatus(`Import partially complete: ${totals.created} created, ${totals.updated} updated, ${totals.skipped} skipped. ${errors[0]}`, true);
+            return;
+        }
+
+        const url = new URL(window.location.href);
+        ['updated', 'added', 'imported', 'created', 'updated_count', 'skipped'].forEach((key) => url.searchParams.delete(key));
+        url.searchParams.set('imported', '1');
+        url.searchParams.set('created', totals.created);
+        url.searchParams.set('updated_count', totals.updated);
+        url.searchParams.set('skipped', totals.skipped);
+        window.location.href = url.toString();
+    } catch (error) {
+        setImportStatus(error.message, true);
+    } finally {
+        importButton.disabled = false;
+        importButton.textContent = 'Import flights';
+    }
 });
 ['flightnr', 'from', 'to', 'route', 'regnr', 'seat'].forEach((id) => {
     document.getElementById(id).addEventListener('input', (event) => {
