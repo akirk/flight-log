@@ -81,6 +81,11 @@ $render_count_list = static function( string $title, array $counts, string $filt
         .field { display: flex; min-width: 0; flex-direction: column; gap: 6px; }
         .field-wide { grid-column: span 2; }
         .field-remarks { grid-column: span 6; }
+        .import-panel { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px; }
+        .import-panel textarea { min-height: 130px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+        .checkbox-field { align-items: center; flex-direction: row; gap: 8px; margin-top: 10px; }
+        .checkbox-field input { width: auto; }
+        .checkbox-field label { color: var(--text); font-size: 13px; font-weight: 700; text-transform: none; }
         label { color: var(--muted); font-size: 12px; font-weight: 800; text-transform: uppercase; }
         input, textarea { width: 100%; border: 1px solid var(--border); border-radius: 6px; background: #fff; color: var(--text); padding: 9px 10px; }
         textarea { min-height: 76px; resize: vertical; }
@@ -175,7 +180,18 @@ $render_count_list = static function( string $title, array $counts, string $filt
             <div class="field"><label for="msn">MSN</label><input id="msn" name="msn" type="number" min="0" value="<?php echo esc_attr( $values['msn'] ); ?>"></div>
             <div class="field field-remarks"><label for="remarks">Remarks</label><textarea id="remarks" name="remarks"><?php echo esc_textarea( $values['remarks'] ); ?></textarea></div>
         </div>
+        <div class="import-panel">
+            <div class="field">
+                <label for="legacy_import_json">Import flights</label>
+                <textarea id="legacy_import_json" name="legacy_import_json" placeholder="Paste phpMyAdmin JSON export, a JSON array, or newline-delimited JSON rows"></textarea>
+            </div>
+            <div class="field checkbox-field">
+                <input id="update_existing" name="update_existing" type="checkbox" value="1">
+                <label for="update_existing">Update existing flights</label>
+            </div>
+        </div>
         <div class="form-actions">
+            <button type="button" class="button secondary" id="legacy-import-submit">Import flights</button>
             <button type="submit" class="button" id="flight-submit"><?php echo esc_html( 'edit' === $form['mode'] ? 'Save changes' : 'Add flight' ); ?></button>
         </div>
     </form>
@@ -324,6 +340,11 @@ toggle.addEventListener('click', () => {
 document.getElementById('flight-form-close').addEventListener('click', () => {
     clearForm();
     setFormOpen(false);
+});
+document.getElementById('legacy-import-submit').addEventListener('click', () => {
+    document.getElementById('flight_action').value = 'import_flights';
+    form.noValidate = true;
+    form.submit();
 });
 ['flightnr', 'from', 'to', 'route', 'regnr', 'seat'].forEach((id) => {
     document.getElementById(id).addEventListener('input', (event) => {

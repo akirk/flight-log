@@ -146,7 +146,7 @@ class App extends BaseApp {
             'mode'              => 'add',
             'original_flightnr' => '',
             'original_date'     => '',
-            'flash'             => isset( $_GET['updated'] ) ? 'Flight updated.' : ( isset( $_GET['added'] ) ? 'Flight added.' : null ),
+            'flash'             => $this->get_flash_message(),
         ];
 
         if ( ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) !== 'POST' ) {
@@ -154,8 +154,12 @@ class App extends BaseApp {
         }
 
         $action = sanitize_key( wp_unslash( $_POST['action'] ?? '' ) );
-        if ( ! in_array( $action, [ 'add_flight', 'edit_flight' ], true ) ) {
+        if ( ! in_array( $action, [ 'add_flight', 'edit_flight', 'import_flights' ], true ) ) {
             return $state;
+        }
+
+        if ( 'import_flights' === $action ) {
+            return $this->handle_import_submission( $state );
         }
 
         $state['show_form'] = true;
@@ -188,6 +192,61 @@ class App extends BaseApp {
         }
 
         wp_safe_redirect( add_query_arg( 'edit' === $state['mode'] ? 'updated' : 'added', '1', remove_query_arg( [ 'updated', 'added' ] ) ) );
+        exit;
+    }
+
+    private function get_flash_message(): ?string {
+        if ( isset( $_GET['updated'] ) ) {
+            return 'Flight updated.';
+        }
+        if ( isset( $_GET['added'] ) ) {
+            return 'Flight added.';
+        }
+        if ( isset( $_GET['imported'] ) ) {
+            return sprintf(
+                'Import complete: %d created, %d updated, %d skipped.',
+                absint( $_GET['created'] ?? 0 ),
+                absint( $_GET['updated_count'] ?? 0 ),
+                absint( $_GET['skipped'] ?? 0 )
+            );
+        }
+
+        return null;
+    }
+
+    private function handle_import_submission( array $state ): array {
+        $state['show_form'] = true;
+
+        if ( ! isset( $_POST[ self::NONCE_NAME ] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST[ self::NONCE_NAME ] ) ), self::NONCE_ACTION ) ) {
+            $state['errors'][] = 'Security check failed. Please try again.';
+            return $state;
+        }
+
+        $input = (string) wp_unslash( $_POST['legacy_import_json'] ?? '' );
+        $rows = $this->parse_import_rows( $input );
+        if ( is_wp_error( $rows ) ) {
+            $state['errors'][] = $rows->get_error_message();
+            return $state;
+        }
+
+        $result = $this->import_legacy_rows( $rows, ! empty( $_POST['update_existing'] ) );
+        if ( ! empty( $result['errors'] ) ) {
+            $state['flash'] = sprintf(
+                'Import partially complete: %d created, %d updated, %d skipped.',
+                $result['created'],
+                $result['updated'],
+                $result['skipped']
+            );
+            $state['errors'] = array_merge( $state['errors'], $result['errors'] );
+            return $state;
+        }
+
+        wp_safe_redirect( add_query_arg( [
+            'imported'      => '1',
+            'created'       => $result['created'],
+            'updated_count' => $result['updated'],
+            'skipped'       => $result['skipped'],
+        ], remove_query_arg( [ 'updated', 'added', 'imported', 'created', 'updated_count', 'skipped' ] ) ) );
         exit;
     }
 
@@ -269,39 +328,26 @@ class App extends BaseApp {
         $update_existing = ! empty( $assoc_args['update-existing'] );
         $rows = $this->read_import_rows_from_stdin();
 
-        $created = 0;
-        $updated = 0;
-        $skipped = 0;
+        if ( is_wp_error( $rows ) ) {
+            \WP_CLI::error( $rows->get_error_message() );
+        }
 
-        foreach ( $rows as $row ) {
-            $values = $this->legacy_row_to_values( $row );
-            $post_id = $this->find_flight_post_id( $values['flightnr'], $values['date'] );
-
-            if ( $post_id && ! $update_existing ) {
-                $skipped++;
-                continue;
-            }
-
-            if ( ! $dry_run ) {
-                $saved = $this->save_flight( $values, $post_id );
-                if ( is_wp_error( $saved ) ) {
-                    \WP_CLI::warning( $saved->get_error_message() );
-                    $skipped++;
-                    continue;
-                }
-            }
-
-            $post_id ? $updated++ : $created++;
+        $result = $this->import_legacy_rows( $rows, $update_existing, $dry_run );
+        foreach ( $result['errors'] as $error ) {
+            \WP_CLI::warning( $error );
         }
 
         $prefix = $dry_run ? 'Dry run: ' : '';
-        \WP_CLI::success( "{$prefix}{$created} created, {$updated} updated, {$skipped} skipped." );
+        \WP_CLI::success( "{$prefix}{$result['created']} created, {$result['updated']} updated, {$result['skipped']} skipped." );
     }
 
-    private function read_import_rows_from_stdin(): array {
-        $input = stream_get_contents( STDIN );
+    private function read_import_rows_from_stdin() {
+        return $this->parse_import_rows( stream_get_contents( STDIN ) );
+    }
+
+    private function parse_import_rows( string $input ) {
         if ( '' === trim( $input ) ) {
-            \WP_CLI::error( 'No import data received on STDIN.' );
+            return new \WP_Error( 'flight_tracker_no_import_data', 'No import data received.' );
         }
 
         $decoded = json_decode( $input, true );
@@ -317,7 +363,7 @@ class App extends BaseApp {
 
             $row = json_decode( $line, true );
             if ( ! is_array( $row ) ) {
-                \WP_CLI::error( 'Invalid JSON on input line ' . ( $line_number + 1 ) . '.' );
+                return new \WP_Error( 'flight_tracker_invalid_import_json', 'Invalid JSON on input line ' . ( $line_number + 1 ) . '.' );
             }
 
             $rows[] = $row;
@@ -326,9 +372,12 @@ class App extends BaseApp {
         return $this->normalize_import_rows( $rows );
     }
 
-    private function normalize_import_rows( array $rows ): array {
+    private function normalize_import_rows( array $rows ) {
         if ( $this->is_phpmyadmin_json_export( $rows ) ) {
             $rows = $this->extract_rows_from_phpmyadmin_json_export( $rows );
+            if ( is_wp_error( $rows ) ) {
+                return $rows;
+            }
         }
 
         if ( isset( $rows['date'], $rows['flightnr'] ) ) {
@@ -337,11 +386,11 @@ class App extends BaseApp {
 
         foreach ( $rows as $index => $row ) {
             if ( ! is_array( $row ) ) {
-                \WP_CLI::error( 'Import row ' . ( $index + 1 ) . ' is not an object.' );
+                return new \WP_Error( 'flight_tracker_invalid_import_row', 'Import row ' . ( $index + 1 ) . ' is not an object.' );
             }
             foreach ( [ 'date', 'flightnr', 'from', 'to' ] as $required_key ) {
                 if ( ! array_key_exists( $required_key, $row ) || '' === (string) $row[ $required_key ] ) {
-                    \WP_CLI::error( 'Import row ' . ( $index + 1 ) . " is missing $required_key." );
+                    return new \WP_Error( 'flight_tracker_missing_import_field', 'Import row ' . ( $index + 1 ) . " is missing $required_key." );
                 }
             }
         }
@@ -356,7 +405,7 @@ class App extends BaseApp {
             && 'header' === $rows[0]['type'];
     }
 
-    private function extract_rows_from_phpmyadmin_json_export( array $export ): array {
+    private function extract_rows_from_phpmyadmin_json_export( array $export ) {
         foreach ( $export as $entry ) {
             if (
                 is_array( $entry )
@@ -369,7 +418,45 @@ class App extends BaseApp {
             }
         }
 
-        \WP_CLI::error( 'Could not find the flights table data in the phpMyAdmin JSON export.' );
+        return new \WP_Error( 'flight_tracker_missing_phpmyadmin_table', 'Could not find the flights table data in the phpMyAdmin JSON export.' );
+    }
+
+    private function import_legacy_rows( array $rows, bool $update_existing = false, bool $dry_run = false ): array {
+        $result = [
+            'created' => 0,
+            'updated' => 0,
+            'skipped' => 0,
+            'errors'  => [],
+        ];
+
+        foreach ( $rows as $index => $row ) {
+            $values = $this->legacy_row_to_values( $row );
+            if ( ! $this->parse_datetime_local( $values['date'] ) ) {
+                $result['errors'][] = 'Import row ' . ( $index + 1 ) . ' has an invalid date.';
+                $result['skipped']++;
+                continue;
+            }
+
+            $post_id = $this->find_flight_post_id( $values['flightnr'], $values['date'] );
+
+            if ( $post_id && ! $update_existing ) {
+                $result['skipped']++;
+                continue;
+            }
+
+            if ( ! $dry_run ) {
+                $saved = $this->save_flight( $values, $post_id );
+                if ( is_wp_error( $saved ) ) {
+                    $result['errors'][] = $saved->get_error_message();
+                    $result['skipped']++;
+                    continue;
+                }
+            }
+
+            $post_id ? $result['updated']++ : $result['created']++;
+        }
+
+        return $result;
     }
 
     private function get_flights(): array {
