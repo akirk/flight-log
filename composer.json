@@ -1,5 +1,5 @@
 {
-    "name": "flight-tracker/flight-tracker",
+    "name": "flight-log/flight-log",
     "description": "A private flight log and statistics app for WordPress.",
     "type": "wordpress-plugin",
     "license": "GPL-2.0-or-later",
@@ -9,7 +9,7 @@
     },
     "autoload": {
         "psr-4": {
-            "FlightTracker\\": "src/"
+            "FlightLog\\": "src/"
         }
     },
     "version": "0.1.0",
@@ -19,6 +19,6 @@
         }
     ],
     "config": {
-        "autoloader-suffix": "flighttracker"
+        "autoloader-suffix": "flightlog"
     }
 }

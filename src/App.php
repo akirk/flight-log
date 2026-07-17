@@ -1,6 +1,6 @@
 <?php
 
-namespace FlightTracker;
+namespace FlightLog;
 
 use DateTime;
 use WpApp\BaseApp;
@@ -8,8 +8,8 @@ use WpApp\WpApp;
 
 class App extends BaseApp {
     public const POST_TYPE = 'tracked_flight';
-    public const NONCE_ACTION = 'flight_tracker_save_flight';
-    public const NONCE_NAME = 'flight_tracker_nonce';
+    public const NONCE_ACTION = 'flight_log_save_flight';
+    public const NONCE_NAME = 'flight_log_nonce';
 
     private const META_KEYS = [
         'flightnr',
@@ -27,15 +27,15 @@ class App extends BaseApp {
     ];
 
     private const TAXONOMIES = [
-        'flight_tracker_airline'       => [ 'Airlines', 'Airline' ],
-        'flight_tracker_airport'       => [ 'Airports', 'Airport' ],
-        'flight_tracker_route'         => [ 'Routes', 'Route' ],
-        'flight_tracker_aircraft_type' => [ 'Aircraft Types', 'Aircraft Type' ],
-        'flight_tracker_manufacturer'  => [ 'Manufacturers', 'Manufacturer' ],
-        'flight_tracker_body_type'     => [ 'Body Types', 'Body Type' ],
-        'flight_tracker_year'          => [ 'Years', 'Year' ],
-        'flight_tracker_seat_position' => [ 'Seat Positions', 'Seat Position' ],
-        'flight_tracker_seat_side'     => [ 'Seat Sides', 'Seat Side' ],
+        'flight_log_airline'       => [ 'Airlines', 'Airline' ],
+        'flight_log_airport'       => [ 'Airports', 'Airport' ],
+        'flight_log_route'         => [ 'Routes', 'Route' ],
+        'flight_log_aircraft_type' => [ 'Aircraft Types', 'Aircraft Type' ],
+        'flight_log_manufacturer'  => [ 'Manufacturers', 'Manufacturer' ],
+        'flight_log_body_type'     => [ 'Body Types', 'Body Type' ],
+        'flight_log_year'          => [ 'Years', 'Year' ],
+        'flight_log_seat_position' => [ 'Seat Positions', 'Seat Position' ],
+        'flight_log_seat_side'     => [ 'Seat Sides', 'Seat Side' ],
     ];
 
     private static $instance;
@@ -44,8 +44,8 @@ class App extends BaseApp {
         self::$instance = $this;
 
         $this->app = new WpApp( $this->get_template_dir(), $this->get_url_path(), [
-            'app_name' => 'Flight Tracker',
-            'my_apps'  => 'Flight Tracker',
+            'app_name' => 'Flight Log',
+            'my_apps'  => 'Flight Log',
         ] );
 
         add_action( 'init', [ $this, 'register_post_types' ] );
@@ -53,7 +53,7 @@ class App extends BaseApp {
         add_action( 'init', [ $this, 'register_meta' ] );
 
         if ( defined( 'WP_CLI' ) && WP_CLI ) {
-            \WP_CLI::add_command( 'flight-tracker import-legacy', [ $this, 'cli_import_legacy' ] );
+            \WP_CLI::add_command( 'flight-log import-legacy', [ $this, 'cli_import_legacy' ] );
         }
     }
 
@@ -62,7 +62,7 @@ class App extends BaseApp {
     }
 
     protected function get_url_path(): string {
-        return 'flight-tracker';
+        return 'flight-log';
     }
 
     protected function get_template_dir(): string {
@@ -78,10 +78,10 @@ class App extends BaseApp {
     public function register_post_types(): void {
         register_post_type( self::POST_TYPE, [
             'labels'            => [
-                'name'          => __( 'Flights', 'flight-tracker' ),
-                'singular_name' => __( 'Flight', 'flight-tracker' ),
-                'add_new_item'  => __( 'Add New Flight', 'flight-tracker' ),
-                'edit_item'     => __( 'Edit Flight', 'flight-tracker' ),
+                'name'          => __( 'Flights', 'flight-log' ),
+                'singular_name' => __( 'Flight', 'flight-log' ),
+                'add_new_item'  => __( 'Add New Flight', 'flight-log' ),
+                'edit_item'     => __( 'Edit Flight', 'flight-log' ),
             ],
             'public'            => false,
             'show_ui'           => true,
@@ -98,8 +98,8 @@ class App extends BaseApp {
         foreach ( self::TAXONOMIES as $taxonomy => $labels ) {
             register_taxonomy( $taxonomy, self::POST_TYPE, [
                 'labels'            => [
-                    'name'          => __( $labels[0], 'flight-tracker' ),
-                    'singular_name' => __( $labels[1], 'flight-tracker' ),
+                    'name'          => __( $labels[0], 'flight-log' ),
+                    'singular_name' => __( $labels[1], 'flight-log' ),
                 ],
                 'public'            => false,
                 'show_ui'           => true,
@@ -347,7 +347,7 @@ class App extends BaseApp {
 
     private function parse_import_rows( string $input ) {
         if ( '' === trim( $input ) ) {
-            return new \WP_Error( 'flight_tracker_no_import_data', 'No import data received.' );
+            return new \WP_Error( 'flight_log_no_import_data', 'No import data received.' );
         }
 
         $decoded = json_decode( $input, true );
@@ -363,7 +363,7 @@ class App extends BaseApp {
 
             $row = json_decode( $line, true );
             if ( ! is_array( $row ) ) {
-                return new \WP_Error( 'flight_tracker_invalid_import_json', 'Invalid JSON on input line ' . ( $line_number + 1 ) . '.' );
+                return new \WP_Error( 'flight_log_invalid_import_json', 'Invalid JSON on input line ' . ( $line_number + 1 ) . '.' );
             }
 
             $rows[] = $row;
@@ -386,11 +386,11 @@ class App extends BaseApp {
 
         foreach ( $rows as $index => $row ) {
             if ( ! is_array( $row ) ) {
-                return new \WP_Error( 'flight_tracker_invalid_import_row', 'Import row ' . ( $index + 1 ) . ' is not an object.' );
+                return new \WP_Error( 'flight_log_invalid_import_row', 'Import row ' . ( $index + 1 ) . ' is not an object.' );
             }
             foreach ( [ 'date', 'flightnr', 'from', 'to' ] as $required_key ) {
                 if ( ! array_key_exists( $required_key, $row ) || '' === (string) $row[ $required_key ] ) {
-                    return new \WP_Error( 'flight_tracker_missing_import_field', 'Import row ' . ( $index + 1 ) . " is missing $required_key." );
+                    return new \WP_Error( 'flight_log_missing_import_field', 'Import row ' . ( $index + 1 ) . " is missing $required_key." );
                 }
             }
         }
@@ -418,7 +418,7 @@ class App extends BaseApp {
             }
         }
 
-        return new \WP_Error( 'flight_tracker_missing_phpmyadmin_table', 'Could not find the flights table data in the phpMyAdmin JSON export.' );
+        return new \WP_Error( 'flight_log_missing_phpmyadmin_table', 'Could not find the flights table data in the phpMyAdmin JSON export.' );
     }
 
     private function import_legacy_rows( array $rows, bool $update_existing = false, bool $dry_run = false ): array {
@@ -601,15 +601,15 @@ class App extends BaseApp {
 
     private function assign_terms( int $post_id, array $flight ): void {
         $terms = [
-            'flight_tracker_airline'       => [ $flight['airline'] ],
-            'flight_tracker_airport'       => array_filter( [ $flight['from'], $flight['to'] ] ),
-            'flight_tracker_route'         => [ $flight['route_key'] ],
-            'flight_tracker_aircraft_type' => [ $flight['aircraft_type'] ],
-            'flight_tracker_manufacturer'  => [ $flight['manufacturer'] ],
-            'flight_tracker_body_type'     => [ $flight['body_type'] ],
-            'flight_tracker_year'          => [ $flight['year'] ],
-            'flight_tracker_seat_position' => [ $flight['seat_position'] ],
-            'flight_tracker_seat_side'     => [ $flight['seat_side'] ],
+            'flight_log_airline'       => [ $flight['airline'] ],
+            'flight_log_airport'       => array_filter( [ $flight['from'], $flight['to'] ] ),
+            'flight_log_route'         => [ $flight['route_key'] ],
+            'flight_log_aircraft_type' => [ $flight['aircraft_type'] ],
+            'flight_log_manufacturer'  => [ $flight['manufacturer'] ],
+            'flight_log_body_type'     => [ $flight['body_type'] ],
+            'flight_log_year'          => [ $flight['year'] ],
+            'flight_log_seat_position' => [ $flight['seat_position'] ],
+            'flight_log_seat_side'     => [ $flight['seat_side'] ],
         ];
 
         foreach ( $terms as $taxonomy => $names ) {
@@ -790,6 +790,6 @@ class App extends BaseApp {
     }
 
     private function meta_key( string $key ): string {
-        return '_flight_tracker_' . $key;
+        return '_flight_log_' . $key;
     }
 }

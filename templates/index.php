@@ -1,7 +1,7 @@
 <?php
-$app = \FlightTracker\App::get_instance();
+$app = \FlightLog\App::get_instance();
 if ( ! $app ) {
-    wp_die( esc_html__( 'Flight Tracker is not initialized.', 'flight-tracker' ) );
+    wp_die( esc_html__( 'Flight Log is not initialized.', 'flight-log' ) );
 }
 
 $data = $app->get_dashboard_data();
@@ -38,7 +38,7 @@ $render_count_list = static function( string $title, array $counts, string $filt
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo wp_app_title( 'Flight Tracker' ); ?></title>
+    <title><?php echo wp_app_title( 'Flight Log' ); ?></title>
     <?php wp_app_head(); ?>
     <style>
         :root {
@@ -139,7 +139,7 @@ $render_count_list = static function( string $title, array $counts, string $filt
         <div class="header-actions">
             <span class="metric"><strong><?php echo esc_html( (string) $summary['total'] ); ?></strong> total</span>
             <span class="metric"><strong><?php echo esc_html( (string) $summary['planned'] ); ?></strong> planned</span>
-            <button type="button" class="button" id="add-flight-toggle"><?php echo $form['show_form'] ? esc_html__( 'Close form', 'flight-tracker' ) : esc_html__( 'Add flight', 'flight-tracker' ); ?></button>
+            <button type="button" class="button" id="add-flight-toggle"><?php echo $form['show_form'] ? esc_html__( 'Close form', 'flight-log' ) : esc_html__( 'Add flight', 'flight-log' ); ?></button>
         </div>
     </header>
 
@@ -159,7 +159,7 @@ $render_count_list = static function( string $title, array $counts, string $filt
     <?php endif; ?>
 
     <form id="flight-form" class="flight-form<?php echo $form['show_form'] ? '' : ' hidden'; ?>" method="post" autocomplete="off">
-        <?php wp_nonce_field( \FlightTracker\App::NONCE_ACTION, \FlightTracker\App::NONCE_NAME ); ?>
+        <?php wp_nonce_field( \FlightLog\App::NONCE_ACTION, \FlightLog\App::NONCE_NAME ); ?>
         <input type="hidden" id="flight_action" name="action" value="<?php echo esc_attr( 'edit' === $form['mode'] ? 'edit_flight' : 'add_flight' ); ?>">
         <input type="hidden" id="original_flightnr" name="original_flightnr" value="<?php echo esc_attr( $form['original_flightnr'] ); ?>">
         <input type="hidden" id="original_date" name="original_date" value="<?php echo esc_attr( $form['original_date'] ); ?>">
