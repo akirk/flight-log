@@ -55,6 +55,11 @@ class App extends BaseApp {
         add_action( 'init', [ $this, 'register_taxonomies' ] );
         add_action( 'init', [ $this, 'register_meta' ] );
         add_action( 'rest_api_init', [ $this, 'register_rest_routes' ] );
+        add_action( 'wp_abilities_api_categories_init', [ $this, 'register_ability_category' ] );
+        add_action( 'wp_abilities_api_init', [ $this, 'register_abilities' ] );
+        add_filter( 'ai_assistant_ability_domains', [ $this, 'ai_assistant_ability_domains' ] );
+        add_filter( 'ai_assistant_welcome_tips', [ $this, 'ai_assistant_welcome_tips' ], 10, 2 );
+        add_filter( 'ai_assistant_ability_instructions', [ $this, 'ai_assistant_ability_instructions' ], 10, 4 );
 
         if ( defined( 'WP_CLI' ) && WP_CLI ) {
             \WP_CLI::add_command( 'flight-log import-legacy', [ $this, 'cli_import_legacy' ] );
@@ -163,6 +168,459 @@ class App extends BaseApp {
                 ],
             ],
         ] );
+    }
+
+    public function register_ability_category(): void {
+        if ( ! function_exists( 'wp_register_ability_category' ) ) {
+            return;
+        }
+
+        wp_register_ability_category( 'flight-log', [
+            'label'       => __( 'Flight Log', 'flight-log' ),
+            'description' => __( 'Abilities for searching, summarizing, adding, editing, and deleting logged flights.', 'flight-log' ),
+        ] );
+    }
+
+    public function register_abilities(): void {
+        if ( ! function_exists( 'wp_register_ability' ) ) {
+            return;
+        }
+
+        wp_register_ability( 'flight-log/get-summary', [
+            'label'               => __( 'Get Flight Log Summary', 'flight-log' ),
+            'description'         => 'Returns totals and grouped flight statistics, including logged/planned flights, airlines, airports, routes, aircraft, years, body types, and seat breakdowns.',
+            'category'            => 'flight-log',
+            'input_schema'        => [
+                'type'                 => 'object',
+                'properties'           => [],
+                'additionalProperties' => false,
+            ],
+            'output_schema'       => $this->summary_ability_output_schema(),
+            'execute_callback'    => [ $this, 'ability_get_summary' ],
+            'permission_callback' => [ $this, 'can_read_flights' ],
+            'meta'                => [
+                'show_in_rest' => true,
+                'annotations'  => [
+                    'instructions' => 'Use this for questions about totals, top airlines, airports, routes, aircraft, years, seat choices, and planned versus logged flights. Use flight-log/search-flights when the user asks for individual matching flights.',
+                    'readonly'     => true,
+                    'destructive'  => false,
+                    'idempotent'   => true,
+                ],
+            ],
+        ] );
+
+        wp_register_ability( 'flight-log/search-flights', [
+            'label'               => __( 'Search Flights', 'flight-log' ),
+            'description'         => 'Searches the flight log and returns matching flight records with IDs that can be used for editing or deletion.',
+            'category'            => 'flight-log',
+            'input_schema'        => [
+                'type'                 => 'object',
+                'properties'           => [
+                    'query'         => [
+                        'type'        => 'string',
+                        'description' => 'Optional free-text search across date, airports, route, flight number, airline, aircraft, registration, seat, and remarks.',
+                    ],
+                    'airport'       => [
+                        'type'        => 'string',
+                        'description' => 'Optional airport code or airport display name to match either origin or destination.',
+                    ],
+                    'airline'       => [
+                        'type'        => 'string',
+                        'description' => 'Optional airline name or two-character flight number prefix.',
+                    ],
+                    'route'         => [
+                        'type'        => 'string',
+                        'description' => 'Optional route code such as VIE-FRA or route display text.',
+                    ],
+                    'year'          => [
+                        'type'        => 'string',
+                        'description' => 'Optional four-digit year.',
+                    ],
+                    'planned'       => [
+                        'type'        => 'boolean',
+                        'description' => 'When true, return only future/planned flights. When false, return only logged flights.',
+                    ],
+                    'limit'         => [
+                        'type'        => 'integer',
+                        'description' => 'Maximum number of flights to return, from 1 to 100. Defaults to 25.',
+                        'minimum'     => 1,
+                        'maximum'     => 100,
+                    ],
+                ],
+                'additionalProperties' => false,
+            ],
+            'output_schema'       => $this->flights_ability_output_schema(),
+            'execute_callback'    => [ $this, 'ability_search_flights' ],
+            'permission_callback' => [ $this, 'can_read_flights' ],
+            'meta'                => [
+                'show_in_rest' => true,
+                'annotations'  => [
+                    'instructions' => 'Use returned id values with flight-log/save-flight or flight-log/delete-flight. If total_matches is greater than returned, mention that the result was limited.',
+                    'readonly'     => true,
+                    'destructive'  => false,
+                    'idempotent'   => true,
+                ],
+            ],
+        ] );
+
+        wp_register_ability( 'flight-log/save-flight', [
+            'label'               => __( 'Save Flight', 'flight-log' ),
+            'description'         => 'Creates a new flight or updates an existing flight by ID. For updates, only changed fields are required. For new flights, date, flightnr, from, and to are required.',
+            'category'            => 'flight-log',
+            'input_schema'        => [
+                'type'                 => 'object',
+                'properties'           => [
+                    'id'           => [
+                        'type'        => 'integer',
+                        'description' => 'Optional existing flight post ID from flight-log/search-flights. When present, omitted fields keep their existing values. Omit to create a new flight.',
+                    ],
+                    'date'         => [
+                        'type'        => 'string',
+                        'description' => 'Flight date/time. Accepts values like 2026-07-18 09:30, 2026-07-18T09:30, or natural input accepted by the app.',
+                    ],
+                    'flightnr'     => [ 'type' => 'string', 'description' => 'Flight number, for example OS123.' ],
+                    'from'         => [ 'type' => 'string', 'description' => 'Origin airport code.' ],
+                    'to'           => [ 'type' => 'string', 'description' => 'Destination airport code.' ],
+                    'route'        => [ 'type' => 'string', 'description' => 'Optional route text. Defaults to FROM-TO when omitted.' ],
+                    'regnr'        => [ 'type' => 'string', 'description' => 'Optional aircraft registration.' ],
+                    'aircraft'     => [ 'type' => 'string', 'description' => 'Optional aircraft type text, for example Airbus A320.' ],
+                    'seat'         => [ 'type' => 'string', 'description' => 'Optional seat such as 12A.' ],
+                    'first_flight' => [ 'type' => 'string', 'description' => 'Optional aircraft first flight date in YYYY-MM-DD format.' ],
+                    'msn'          => [ 'type' => 'string', 'description' => 'Optional manufacturer serial number.' ],
+                    'remarks'      => [ 'type' => 'string', 'description' => 'Optional notes.' ],
+                ],
+                'additionalProperties' => false,
+            ],
+            'output_schema'       => $this->flight_ability_output_schema(),
+            'execute_callback'    => [ $this, 'ability_save_flight' ],
+            'permission_callback' => [ $this, 'can_write_flights' ],
+            'meta'                => [
+                'show_in_rest' => true,
+                'annotations'  => [
+                    'instructions' => 'Use search-flights first before editing when the user identifies a flight ambiguously. After saving, summarize the route, date, flight number, and whether the flight was created or updated.',
+                    'readonly'     => false,
+                    'destructive'  => false,
+                    'idempotent'   => false,
+                ],
+            ],
+        ] );
+
+        wp_register_ability( 'flight-log/delete-flight', [
+            'label'               => __( 'Delete Flight', 'flight-log' ),
+            'description'         => 'Moves one flight to the trash by ID.',
+            'category'            => 'flight-log',
+            'input_schema'        => [
+                'type'                 => 'object',
+                'properties'           => [
+                    'id' => [
+                        'type'        => 'integer',
+                        'description' => 'Flight post ID from flight-log/search-flights.',
+                    ],
+                ],
+                'required'             => [ 'id' ],
+                'additionalProperties' => false,
+            ],
+            'output_schema'       => [
+                'type'       => 'object',
+                'properties' => [
+                    'deleted' => [ 'type' => 'boolean' ],
+                    'id'      => [ 'type' => 'integer' ],
+                    'flight'  => $this->flight_ability_output_schema(),
+                    'app_url' => [ 'type' => 'string' ],
+                ],
+            ],
+            'execute_callback'    => [ $this, 'ability_delete_flight' ],
+            'permission_callback' => [ $this, 'can_write_flights' ],
+            'meta'                => [
+                'show_in_rest' => true,
+                'annotations'  => [
+                    'instructions' => 'Use search-flights first and confirm the exact flight when the user request could match more than one flight.',
+                    'readonly'     => false,
+                    'destructive'  => true,
+                    'idempotent'   => false,
+                ],
+            ],
+        ] );
+    }
+
+    public function ai_assistant_ability_domains( $domains ) {
+        if ( ! is_array( $domains ) ) {
+            $domains = [];
+        }
+
+        $domains['flight-log'] = 'Flight Log, flights, flight history, logged flights, planned flights, airports, airlines, aircraft, routes, registrations, seats, trip stats, aviation logbook';
+        return $domains;
+    }
+
+    public function ai_assistant_welcome_tips( $tips, $context ) {
+        $tips['flight-log'] = [
+            __( 'Ask me for flight stats, like top airlines, busiest airports, yearly totals, or window-seat history.', 'flight-log' ),
+            __( 'Ask me to find, add, edit, or delete flights from this log.', 'flight-log' ),
+        ];
+
+        return $tips;
+    }
+
+    public function ai_assistant_ability_instructions( $instructions, $ability_id, $args, $result ) {
+        if ( 0 !== strpos( (string) $ability_id, 'flight-log/' ) ) {
+            return $instructions;
+        }
+
+        if ( 'flight-log/search-flights' === $ability_id ) {
+            return 'Present matching flights as a compact list with date, route, flight number, airline, aircraft, registration, and seat when available.';
+        }
+
+        if ( in_array( $ability_id, [ 'flight-log/save-flight', 'flight-log/delete-flight' ], true ) ) {
+            return 'The visible Flight Log app refreshes after this tool call. Briefly summarize the changed flight and include the Flight Log app URL if useful.';
+        }
+
+        return $instructions;
+    }
+
+    public function can_read_flights(): bool {
+        return current_user_can( 'edit_posts' );
+    }
+
+    public function can_write_flights(): bool {
+        return current_user_can( 'edit_posts' );
+    }
+
+    public function ability_get_summary( $input ): array {
+        $data = $this->get_dashboard_data();
+
+        return [
+            'summary' => $data['summary'],
+            'app_url' => $this->app_url(),
+        ];
+    }
+
+    public function ability_search_flights( $input ): array {
+        $input = is_array( $input ) ? $input : [];
+        $limit = max( 1, min( 100, absint( $input['limit'] ?? 25 ) ) );
+        $matches = [];
+
+        foreach ( $this->get_flights() as $flight ) {
+            if ( $this->flight_matches_ability_input( $flight, $input ) ) {
+                $matches[] = $this->flight_for_ability_output( $flight );
+            }
+        }
+
+        return [
+            'total_matches' => count( $matches ),
+            'returned'      => min( count( $matches ), $limit ),
+            'flights'       => array_slice( $matches, 0, $limit ),
+            'app_url'       => $this->app_url(),
+        ];
+    }
+
+    public function ability_save_flight( $input ) {
+        $input = is_array( $input ) ? $input : [];
+        $post_id = absint( $input['id'] ?? 0 );
+        $created = ! $post_id;
+        $base_values = [];
+
+        if ( $post_id && ! $this->is_flight_post( $post_id ) ) {
+            return new \WP_Error( 'flight_log_ability_flight_not_found', 'Could not find the flight to update.' );
+        }
+
+        if ( $post_id ) {
+            $base_values = $this->post_to_flight( get_post( $post_id ) );
+        }
+
+        $values = $this->ability_input_to_values( $input, $base_values );
+        $errors = $this->validate_form_values( $values, 'add', '', '' );
+        if ( $errors ) {
+            return new \WP_Error( 'flight_log_ability_invalid_flight', implode( ' ', $errors ) );
+        }
+
+        $values = $this->normalize_submitted_values( $values );
+        $this->prime_reference_names_for_rows( [ $values ] );
+        $saved = $this->save_flight( $values, $post_id );
+        if ( is_wp_error( $saved ) ) {
+            return $saved;
+        }
+
+        $flight = $this->post_to_flight( get_post( $saved ) );
+        $output = $this->flight_for_ability_output( $flight );
+        $output['created'] = $created;
+        $output['updated'] = ! $created;
+        $output['app_url'] = $this->app_url();
+
+        return $output;
+    }
+
+    public function ability_delete_flight( $input ) {
+        $input = is_array( $input ) ? $input : [];
+        $post_id = absint( $input['id'] ?? 0 );
+
+        if ( ! $post_id || ! $this->is_flight_post( $post_id ) ) {
+            return new \WP_Error( 'flight_log_ability_flight_not_found', 'Could not find the flight to delete.' );
+        }
+
+        $flight = $this->flight_for_ability_output( $this->post_to_flight( get_post( $post_id ) ) );
+        $deleted = (bool) wp_trash_post( $post_id );
+
+        if ( ! $deleted ) {
+            return new \WP_Error( 'flight_log_ability_delete_failed', 'Could not move the flight to the trash.' );
+        }
+
+        return [
+            'deleted' => true,
+            'id'      => $post_id,
+            'flight'  => $flight,
+            'app_url' => $this->app_url(),
+        ];
+    }
+
+    private function summary_ability_output_schema(): array {
+        return [
+            'type'       => 'object',
+            'properties' => [
+                'summary' => [
+                    'type'       => 'object',
+                    'properties' => [
+                        'total'      => [ 'type' => 'integer' ],
+                        'logged'     => [ 'type' => 'integer' ],
+                        'planned'    => [ 'type' => 'integer' ],
+                        'airports'   => [ 'type' => 'object' ],
+                        'airlines'   => [ 'type' => 'object' ],
+                        'routes'     => [ 'type' => 'object' ],
+                        'aircraft'   => [ 'type' => 'object' ],
+                        'types'      => [ 'type' => 'object' ],
+                        'body_types' => [ 'type' => 'object' ],
+                        'years'      => [ 'type' => 'object' ],
+                        'seats'      => [ 'type' => 'object' ],
+                        'seat_sides' => [ 'type' => 'object' ],
+                        'seat_pos'   => [ 'type' => 'object' ],
+                    ],
+                ],
+                'app_url' => [ 'type' => 'string' ],
+            ],
+        ];
+    }
+
+    private function flights_ability_output_schema(): array {
+        return [
+            'type'       => 'object',
+            'properties' => [
+                'total_matches' => [ 'type' => 'integer' ],
+                'returned'      => [ 'type' => 'integer' ],
+                'flights'       => [
+                    'type'  => 'array',
+                    'items' => $this->flight_ability_output_schema(),
+                ],
+                'app_url'       => [ 'type' => 'string' ],
+            ],
+        ];
+    }
+
+    private function flight_ability_output_schema(): array {
+        return [
+            'type'       => 'object',
+            'properties' => [
+                'id'            => [ 'type' => 'integer', 'description' => 'Use with flight-log/save-flight or flight-log/delete-flight.' ],
+                'key'           => [ 'type' => 'string' ],
+                'date'          => [ 'type' => 'string' ],
+                'date_display'  => [ 'type' => 'string' ],
+                'flightnr'      => [ 'type' => 'string' ],
+                'from'          => [ 'type' => 'string' ],
+                'to'            => [ 'type' => 'string' ],
+                'route_display' => [ 'type' => 'string' ],
+                'airline'       => [ 'type' => 'string' ],
+                'from_airport'  => [ 'type' => 'string' ],
+                'to_airport'    => [ 'type' => 'string' ],
+                'regnr'         => [ 'type' => 'string' ],
+                'aircraft'      => [ 'type' => 'string' ],
+                'aircraft_type' => [ 'type' => 'string' ],
+                'body_type'     => [ 'type' => 'string' ],
+                'seat'          => [ 'type' => 'string' ],
+                'seat_position' => [ 'type' => 'string' ],
+                'seat_side'     => [ 'type' => 'string' ],
+                'age'           => [ 'type' => 'string' ],
+                'remarks'       => [ 'type' => 'string' ],
+                'is_future'     => [ 'type' => 'boolean' ],
+                'created'       => [ 'type' => 'boolean' ],
+                'updated'       => [ 'type' => 'boolean' ],
+                'app_url'       => [ 'type' => 'string' ],
+            ],
+        ];
+    }
+
+    private function ability_input_to_values( array $input, array $base_values = [] ): array {
+        $values = $this->empty_form_values();
+        foreach ( $values as $key => $default ) {
+            $value = array_key_exists( $key, $input ) ? $input[ $key ] : ( $base_values[ $key ] ?? '' );
+            $values[ $key ] = 'remarks' === $key
+                ? sanitize_textarea_field( (string) $value )
+                : sanitize_text_field( (string) $value );
+        }
+
+        foreach ( [ 'flightnr', 'from', 'to', 'route', 'regnr', 'seat' ] as $key ) {
+            $values[ $key ] = strtoupper( $values[ $key ] );
+        }
+
+        return $values;
+    }
+
+    private function flight_matches_ability_input( array $flight, array $input ): bool {
+        $query = strtolower( trim( (string) ( $input['query'] ?? '' ) ) );
+        if ( '' !== $query && ! $this->flight_contains_text( $flight, $query ) ) {
+            return false;
+        }
+
+        foreach ( [
+            'year'    => [ 'year' ],
+            'route'   => [ 'route_key', 'route_display' ],
+            'airline' => [ 'airline', 'flightnr' ],
+            'airport' => [ 'from', 'to', 'from_airport', 'to_airport' ],
+        ] as $input_key => $flight_keys ) {
+            $needle = strtolower( trim( (string) ( $input[ $input_key ] ?? '' ) ) );
+            if ( '' === $needle ) {
+                continue;
+            }
+
+            $matched = false;
+            foreach ( $flight_keys as $flight_key ) {
+                if ( false !== strpos( strtolower( (string) ( $flight[ $flight_key ] ?? '' ) ), $needle ) ) {
+                    $matched = true;
+                    break;
+                }
+            }
+
+            if ( ! $matched ) {
+                return false;
+            }
+        }
+
+        if ( array_key_exists( 'planned', $input ) && null !== $input['planned'] && (bool) $flight['is_future'] !== (bool) $input['planned'] ) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function flight_contains_text( array $flight, string $query ): bool {
+        foreach ( [ 'date_display', 'from', 'to', 'from_airport', 'to_airport', 'route_display', 'flightnr', 'regnr', 'airline', 'aircraft', 'seat', 'remarks' ] as $key ) {
+            if ( false !== strpos( strtolower( (string) ( $flight[ $key ] ?? '' ) ), $query ) ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function flight_for_ability_output( array $flight ): array {
+        unset( $flight['date_obj'] );
+        return $flight;
+    }
+
+    private function is_flight_post( int $post_id ): bool {
+        $post = get_post( $post_id );
+        return $post instanceof \WP_Post && self::POST_TYPE === $post->post_type && 'trash' !== $post->post_status;
+    }
+
+    private function app_url(): string {
+        return function_exists( 'home_url' ) ? home_url( '/' . $this->get_url_path() . '/' ) : '/' . $this->get_url_path() . '/';
     }
 
     public function rest_import_legacy( \WP_REST_Request $request ) {

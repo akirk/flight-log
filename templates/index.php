@@ -74,6 +74,7 @@ $render_count_list = static function( string $title, array $counts, string $filt
         .notice { margin: 0 0 14px; border: 1px solid #a7f3d0; border-radius: 6px; background: #ecfdf5; color: #064e3b; padding: 10px 12px; font-weight: 700; }
         .notice.error { border-color: #fecaca; background: #fff1f0; color: var(--danger); }
         .notice ul { margin: 6px 0 0 18px; padding: 0; }
+        .screen-reader-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(1px, 1px, 1px, 1px); white-space: nowrap; }
         .flight-form { margin: 0 0 18px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); padding: 16px; }
         .flight-form.hidden { display: none; }
         .form-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
@@ -169,7 +170,7 @@ $render_count_list = static function( string $title, array $counts, string $filt
         </div>
     <?php endif; ?>
 
-    <form id="flight-form" class="flight-form<?php echo $form['show_form'] ? '' : ' hidden'; ?>" method="post" autocomplete="off">
+    <form id="flight-form" class="flight-form<?php echo $form['show_form'] ? '' : ' hidden'; ?>" method="post" autocomplete="off" aria-labelledby="flight-form-title">
         <?php wp_nonce_field( \FlightLog\App::NONCE_ACTION, \FlightLog\App::NONCE_NAME ); ?>
         <input type="hidden" id="flight_action" name="action" value="<?php echo esc_attr( 'edit' === $form['mode'] ? 'edit_flight' : 'add_flight' ); ?>">
         <input type="hidden" id="original_flightnr" name="original_flightnr" value="<?php echo esc_attr( $form['original_flightnr'] ); ?>">
@@ -219,7 +220,7 @@ $render_count_list = static function( string $title, array $counts, string $filt
         </details>
     </form>
 
-    <section class="overview">
+    <section class="overview" aria-label="Flight log summary" data-ai-assistant-important>
         <div class="stat"><span>Logged flights</span><strong><?php echo esc_html( (string) $summary['logged'] ); ?></strong></div>
         <button type="button" class="stat stat-button" id="airport-filter-open"><span>Airports</span><strong><?php echo esc_html( (string) count( $summary['airports'] ) ); ?></strong></button>
         <div class="stat"><span>Routes</span><strong><?php echo esc_html( (string) count( $summary['routes'] ) ); ?></strong></div>
@@ -247,6 +248,7 @@ $render_count_list = static function( string $title, array $counts, string $filt
     <section class="table-panel">
         <div class="table-scroll">
             <table>
+                <caption class="screen-reader-text">Flights</caption>
                 <thead>
                     <tr>
                         <th>Date</th>
@@ -563,6 +565,26 @@ document.getElementById('clear-filter').addEventListener('click', () => {
 });
 search.addEventListener('input', renderRows);
 renderRows();
+
+(function() {
+    const refreshAfterFlightAbility = () => window.location.reload();
+    ['flight-log/save-flight', 'flight-log/delete-flight'].forEach((ability) => {
+        const subscription = {
+            criteria: {
+                ability,
+                success: true
+            },
+            callback: refreshAfterFlightAbility
+        };
+
+        if (window.aiAssistant && typeof window.aiAssistant.onToolCall === 'function') {
+            window.aiAssistant.onToolCall(subscription.criteria, subscription.callback);
+        } else {
+            window.aiAssistantToolCallbacks = window.aiAssistantToolCallbacks || [];
+            window.aiAssistantToolCallbacks.push(subscription);
+        }
+    });
+})();
 </script>
 <?php wp_app_body_close(); ?>
 </body>
