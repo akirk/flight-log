@@ -277,7 +277,7 @@ $render_count_list = static function( string $title, array $counts, string $filt
     </section>
 </main>
 <script>
-const flights = <?php echo wp_json_encode( $json_flights ); ?>;
+let flights = <?php echo wp_json_encode( $json_flights ); ?>;
 const importConfig = <?php echo wp_json_encode( [
     'endpoint'          => esc_url_raw( rest_url( 'flight-log/v1/import-legacy' ) ),
     'referenceEndpoint' => esc_url_raw( rest_url( 'flight-log/v1/reference-names' ) ),
@@ -579,7 +579,35 @@ search.addEventListener('input', renderRows);
 renderRows();
 
 (function() {
-    const refreshAfterFlightAbility = () => window.location.reload();
+    const sortFlights = () => {
+        flights.sort((a, b) => text(b.date).localeCompare(text(a.date)));
+    };
+    const refreshAfterFlightAbility = (context) => {
+        const output = context && context.result ? context.result : {};
+        const ability = context && context.arguments ? context.arguments.ability : '';
+
+        if (ability === 'flight-log/delete-flight') {
+            const deletedId = Number(output.id || (output.flight && output.flight.id) || 0);
+            if (deletedId) {
+                flights = flights.filter((flight) => Number(flight.id) !== deletedId);
+                renderRows();
+            }
+            return;
+        }
+
+        const savedFlight = output.result && typeof output.result === 'object' ? output.result : output;
+        if (!savedFlight || !savedFlight.id) return;
+
+        const savedId = Number(savedFlight.id);
+        const index = flights.findIndex((flight) => Number(flight.id) === savedId);
+        if (index >= 0) {
+            flights[index] = savedFlight;
+        } else {
+            flights.unshift(savedFlight);
+        }
+        sortFlights();
+        renderRows();
+    };
     ['flight-log/save-flight', 'flight-log/delete-flight'].forEach((ability) => {
         const subscription = {
             criteria: {
