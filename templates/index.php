@@ -70,7 +70,9 @@ $render_count_list = static function( string $title, array $counts, string $filt
         .metric strong { color: var(--text); font-size: 18px; line-height: 1; }
         .button { min-height: 38px; border: 1px solid var(--accent); border-radius: 6px; background: var(--accent); color: #fff; cursor: pointer; font-weight: 800; padding: 8px 12px; }
         .button.secondary { background: #fff; color: var(--accent); }
+        .button.danger { border-color: var(--danger); background: var(--danger); color: #fff; }
         .button:hover, .button:focus { box-shadow: 0 0 0 3px rgba(15, 118, 110, .16); outline: 0; }
+        .button.danger:hover, .button.danger:focus { box-shadow: 0 0 0 3px rgba(180, 35, 24, .16); }
         .notice { margin: 0 0 14px; border: 1px solid #a7f3d0; border-radius: 6px; background: #ecfdf5; color: #064e3b; padding: 10px 12px; font-weight: 700; }
         .notice.error { border-color: #fecaca; background: #fff1f0; color: var(--danger); }
         .notice ul { margin: 6px 0 0 18px; padding: 0; }
@@ -92,6 +94,7 @@ $render_count_list = static function( string $title, array $counts, string $filt
         .checkbox-field { align-items: center; flex-direction: row; gap: 8px; margin-top: 10px; }
         .checkbox-field input { width: auto; }
         .checkbox-field label { color: var(--text); font-size: 13px; font-weight: 700; text-transform: none; }
+        .hidden-action { display: none; }
         label { color: var(--muted); font-size: 12px; font-weight: 800; text-transform: uppercase; }
         input, textarea { width: 100%; border: 1px solid var(--border); border-radius: 6px; background: #fff; color: var(--text); padding: 9px 10px; }
         textarea { min-height: 76px; resize: vertical; }
@@ -193,6 +196,7 @@ $render_count_list = static function( string $title, array $counts, string $filt
             <div class="field field-remarks"><label for="remarks">Remarks</label><textarea id="remarks" name="remarks"><?php echo esc_textarea( $values['remarks'] ); ?></textarea></div>
         </div>
         <div class="form-actions">
+            <button type="submit" class="button danger<?php echo 'edit' === $form['mode'] ? '' : ' hidden-action'; ?>" id="flight-delete" formnovalidate>Delete flight</button>
             <button type="submit" class="button" id="flight-submit"><?php echo esc_html( 'edit' === $form['mode'] ? 'Save changes' : 'Add flight' ); ?></button>
         </div>
         <details class="import-panel">
@@ -309,6 +313,7 @@ function setFormMode(mode) {
     document.getElementById('flight_action').value = edit ? 'edit_flight' : 'add_flight';
     document.getElementById('flight-form-title').textContent = edit ? 'Edit flight' : 'Add flight';
     document.getElementById('flight-submit').textContent = edit ? 'Save changes' : 'Add flight';
+    document.getElementById('flight-delete').classList.toggle('hidden-action', !edit);
 }
 
 function clearForm() {
@@ -386,6 +391,13 @@ toggle.addEventListener('click', () => {
 document.getElementById('flight-form-close').addEventListener('click', () => {
     clearForm();
     setFormOpen(false);
+});
+document.getElementById('flight-delete').addEventListener('click', (event) => {
+    if (!confirm('Delete this flight?')) {
+        event.preventDefault();
+        return;
+    }
+    document.getElementById('flight_action').value = 'delete_flight';
 });
 airportFilterOpen.addEventListener('click', () => {
     filterPanel.open = true;
@@ -530,7 +542,7 @@ importButton.addEventListener('click', async () => {
         }
 
         const url = new URL(window.location.href);
-        ['updated', 'added', 'imported', 'created', 'updated_count', 'skipped'].forEach((key) => url.searchParams.delete(key));
+        ['updated', 'added', 'deleted', 'imported', 'created', 'updated_count', 'skipped'].forEach((key) => url.searchParams.delete(key));
         url.searchParams.set('imported', '1');
         url.searchParams.set('created', totals.created);
         url.searchParams.set('updated_count', totals.updated);
