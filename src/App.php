@@ -682,7 +682,7 @@ class App extends BaseApp {
         }
 
         $action = sanitize_key( wp_unslash( $_POST['action'] ?? '' ) );
-        if ( ! in_array( $action, [ 'add_flight', 'edit_flight', 'import_flights' ], true ) ) {
+        if ( ! in_array( $action, [ 'add_flight', 'edit_flight', 'delete_flight', 'import_flights' ], true ) ) {
             return $state;
         }
 
@@ -691,10 +691,15 @@ class App extends BaseApp {
         }
 
         $state['show_form'] = true;
-        $state['mode'] = 'edit_flight' === $action ? 'edit' : 'add';
+        $state['mode'] = in_array( $action, [ 'edit_flight', 'delete_flight' ], true ) ? 'edit' : 'add';
         $state['original_flightnr'] = sanitize_text_field( wp_unslash( $_POST['original_flightnr'] ?? '' ) );
         $state['original_date'] = sanitize_text_field( wp_unslash( $_POST['original_date'] ?? '' ) );
         $state['values'] = $this->posted_form_values();
+
+        if ( 'delete_flight' === $action ) {
+            return $this->handle_delete_submission( $state );
+        }
+
         $state['errors'] = $this->validate_form_values( $state['values'], $state['mode'], $state['original_flightnr'], $state['original_date'] );
 
         if ( ! isset( $_POST[ self::NONCE_NAME ] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST[ self::NONCE_NAME ] ) ), self::NONCE_ACTION ) ) {
@@ -720,7 +725,7 @@ class App extends BaseApp {
             return $state;
         }
 
-        wp_safe_redirect( add_query_arg( 'edit' === $state['mode'] ? 'updated' : 'added', '1', remove_query_arg( [ 'updated', 'added' ] ) ) );
+        wp_safe_redirect( add_query_arg( 'edit' === $state['mode'] ? 'updated' : 'added', '1', $this->remove_flash_query_args() ) );
         exit;
     }
 
@@ -730,6 +735,9 @@ class App extends BaseApp {
         }
         if ( isset( $_GET['added'] ) ) {
             return 'Flight added.';
+        }
+        if ( isset( $_GET['deleted'] ) ) {
+            return 'Flight deleted.';
         }
         if ( isset( $_GET['imported'] ) ) {
             return sprintf(
@@ -741,6 +749,37 @@ class App extends BaseApp {
         }
 
         return null;
+    }
+
+    private function handle_delete_submission( array $state ): array {
+        if ( ! isset( $_POST[ self::NONCE_NAME ] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST[ self::NONCE_NAME ] ) ), self::NONCE_ACTION ) ) {
+            $state['errors'][] = 'Security check failed. Please try again.';
+            return $state;
+        }
+
+        if ( '' === $state['original_flightnr'] || '' === $state['original_date'] ) {
+            $state['errors'][] = 'Original flight key is missing.';
+            return $state;
+        }
+
+        $post_id = $this->find_flight_post_id( $state['original_flightnr'], $state['original_date'] );
+        if ( ! $post_id ) {
+            $state['errors'][] = 'Could not find the flight to delete.';
+            return $state;
+        }
+
+        if ( ! current_user_can( 'delete_post', $post_id ) ) {
+            $state['errors'][] = 'You are not allowed to delete this flight.';
+            return $state;
+        }
+
+        if ( ! wp_trash_post( $post_id ) ) {
+            $state['errors'][] = 'Could not move the flight to the trash.';
+            return $state;
+        }
+
+        wp_safe_redirect( add_query_arg( 'deleted', '1', $this->remove_flash_query_args() ) );
+        exit;
     }
 
     private function handle_import_submission( array $state ): array {
@@ -775,8 +814,12 @@ class App extends BaseApp {
             'created'       => $result['created'],
             'updated_count' => $result['updated'],
             'skipped'       => $result['skipped'],
-        ], remove_query_arg( [ 'updated', 'added', 'imported', 'created', 'updated_count', 'skipped' ] ) ) );
+        ], $this->remove_flash_query_args() ) );
         exit;
+    }
+
+    private function remove_flash_query_args(): string {
+        return remove_query_arg( [ 'updated', 'added', 'deleted', 'imported', 'created', 'updated_count', 'skipped' ] );
     }
 
     public function get_dashboard_data(): array {
