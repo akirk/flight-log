@@ -434,6 +434,21 @@ class App extends BaseApp {
         }
 
         $values = $this->normalize_submitted_values( $values );
+        if ( ! $post_id ) {
+            $existing_post_id = $this->find_flight_post_id( $values['flightnr'], $values['date'] );
+            if ( $existing_post_id ) {
+                $output = $this->flight_for_ability_output( $this->post_to_flight( get_post( $existing_post_id ) ) );
+                $output['created'] = false;
+                $output['updated'] = false;
+                $output['duplicate'] = true;
+                $output['app_url'] = $this->app_url();
+
+                return $output;
+            }
+        } elseif ( $this->find_duplicate_flight_post_id( $values['flightnr'], $values['date'], $post_id ) ) {
+            return new \WP_Error( 'flight_log_ability_duplicate_flight', 'Another flight already exists with the same flight number and date.' );
+        }
+
         $this->prime_reference_names_for_rows( [ $values ] );
         $saved = $this->save_flight( $values, $post_id );
         if ( is_wp_error( $saved ) ) {
@@ -541,6 +556,7 @@ class App extends BaseApp {
                 'is_future'     => [ 'type' => 'boolean' ],
                 'created'       => [ 'type' => 'boolean' ],
                 'updated'       => [ 'type' => 'boolean' ],
+                'duplicate'     => [ 'type' => 'boolean' ],
                 'app_url'       => [ 'type' => 'string' ],
             ],
         ];
@@ -610,6 +626,10 @@ class App extends BaseApp {
     }
 
     private function flight_for_ability_output( array $flight ): array {
+        if ( isset( $flight['date_obj'] ) && $flight['date_obj'] instanceof DateTime ) {
+            $flight['is_future'] = $flight['date_obj'] > new DateTime();
+        }
+
         unset( $flight['date_obj'] );
         return $flight;
     }
@@ -711,7 +731,6 @@ class App extends BaseApp {
         }
 
         $values = $this->normalize_submitted_values( $state['values'] );
-        $this->prime_reference_names_for_rows( [ $values ] );
         $post_id = 'edit' === $state['mode'] ? $this->find_flight_post_id( $state['original_flightnr'], $state['original_date'] ) : 0;
 
         if ( 'edit' === $state['mode'] && ! $post_id ) {
@@ -719,6 +738,12 @@ class App extends BaseApp {
             return $state;
         }
 
+        if ( $this->find_duplicate_flight_post_id( $values['flightnr'], $values['date'], $post_id ) ) {
+            $state['errors'][] = 'A flight with the same flight number and date already exists.';
+            return $state;
+        }
+
+        $this->prime_reference_names_for_rows( [ $values ] );
         $saved = $this->save_flight( $values, $post_id );
         if ( is_wp_error( $saved ) ) {
             $state['errors'][] = $saved->get_error_message();
@@ -1229,6 +1254,15 @@ class App extends BaseApp {
         ] );
 
         return $posts ? (int) $posts[0] : 0;
+    }
+
+    private function find_duplicate_flight_post_id( string $flightnr, string $date, int $exclude_post_id = 0 ): int {
+        $post_id = $this->find_flight_post_id( $flightnr, $date );
+        if ( ! $post_id || $post_id === $exclude_post_id ) {
+            return 0;
+        }
+
+        return $post_id;
     }
 
     private function parse_datetime_local( string $value ): ?DateTime {
