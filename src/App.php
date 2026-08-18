@@ -48,6 +48,7 @@ class App extends BaseApp {
 
         $this->app = new WpApp( $this->get_template_dir(), $this->get_url_path(), [
             'app_name' => 'Flight Log',
+	    'require_login' => true,
             'my_apps'  => 'Flight Log',
 	    'my_apps_icon' => 'dashicons-airplane',
         ] );
