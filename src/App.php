@@ -26,7 +26,7 @@ class App extends BaseApp {
         'msn',
         'seat',
         'remarks',
-        'legacy_key',
+        'flight_key',
     ];
 
     private const TAXONOMIES = [
@@ -56,16 +56,11 @@ class App extends BaseApp {
         add_action( 'init', [ $this, 'register_post_types' ] );
         add_action( 'init', [ $this, 'register_taxonomies' ] );
         add_action( 'init', [ $this, 'register_meta' ] );
-        add_action( 'rest_api_init', [ $this, 'register_rest_routes' ] );
         add_action( 'wp_abilities_api_categories_init', [ $this, 'register_ability_category' ] );
         add_action( 'wp_abilities_api_init', [ $this, 'register_abilities' ] );
         add_filter( 'ai_assistant_ability_domains', [ $this, 'ai_assistant_ability_domains' ] );
         add_filter( 'ai_assistant_welcome_tips', [ $this, 'ai_assistant_welcome_tips' ], 10, 2 );
         add_filter( 'ai_assistant_ability_instructions', [ $this, 'ai_assistant_ability_instructions' ], 10, 4 );
-
-        if ( defined( 'WP_CLI' ) && WP_CLI ) {
-            \WP_CLI::add_command( 'flight-log import-legacy', [ $this, 'cli_import_legacy' ] );
-        }
     }
 
     public static function get_instance(): ?self {
@@ -133,43 +128,6 @@ class App extends BaseApp {
                 },
             ] );
         }
-    }
-
-    public function register_rest_routes(): void {
-        register_rest_route( 'flight-log/v1', '/import-legacy', [
-            'methods'             => 'POST',
-            'callback'            => [ $this, 'rest_import_legacy' ],
-            'permission_callback' => static function() {
-                return current_user_can( 'edit_posts' );
-            },
-            'args'                => [
-                'rows'            => [
-                    'required' => true,
-                    'type'     => 'array',
-                ],
-                'update_existing' => [
-                    'required' => false,
-                    'type'     => 'boolean',
-                ],
-            ],
-        ] );
-        register_rest_route( 'flight-log/v1', '/reference-names', [
-            'methods'             => 'POST',
-            'callback'            => [ $this, 'rest_reference_names' ],
-            'permission_callback' => static function() {
-                return current_user_can( 'edit_posts' );
-            },
-            'args'                => [
-                'airport_codes' => [
-                    'required' => false,
-                    'type'     => 'array',
-                ],
-                'airline_codes' => [
-                    'required' => false,
-                    'type'     => 'array',
-                ],
-            ],
-        ] );
     }
 
     public function register_ability_category(): void {
@@ -645,35 +603,6 @@ class App extends BaseApp {
         return function_exists( 'home_url' ) ? home_url( '/' . $this->get_url_path() . '/' ) : '/' . $this->get_url_path() . '/';
     }
 
-    public function rest_import_legacy( \WP_REST_Request $request ) {
-        $rows = $request->get_param( 'rows' );
-        if ( ! is_array( $rows ) ) {
-            return new \WP_Error( 'flight_log_invalid_import_rows', 'Import rows must be an array.', [ 'status' => 400 ] );
-        }
-
-        $rows = $this->normalize_import_rows( $rows );
-        if ( is_wp_error( $rows ) ) {
-            $rows->add_data( [ 'status' => 400 ] );
-            return $rows;
-        }
-
-        return rest_ensure_response( $this->import_legacy_rows( $rows, (bool) $request->get_param( 'update_existing' ) ) );
-    }
-
-    public function rest_reference_names( \WP_REST_Request $request ) {
-        $result = $this->prime_reference_names(
-            (array) $request->get_param( 'airport_codes' ),
-            (array) $request->get_param( 'airline_codes' )
-        );
-
-        if ( is_wp_error( $result ) ) {
-            $result->add_data( [ 'status' => 502 ] );
-            return $result;
-        }
-
-        return rest_ensure_response( $result );
-    }
-
     public function sanitize_meta_value( $value ) {
         return is_scalar( $value ) ? (string) $value : '';
     }
@@ -704,12 +633,8 @@ class App extends BaseApp {
         }
 
         $action = sanitize_key( wp_unslash( $_POST['action'] ?? '' ) );
-        if ( ! in_array( $action, [ 'add_flight', 'edit_flight', 'delete_flight', 'import_flights' ], true ) ) {
+        if ( ! in_array( $action, [ 'add_flight', 'edit_flight', 'delete_flight' ], true ) ) {
             return $state;
-        }
-
-        if ( 'import_flights' === $action ) {
-            return $this->handle_import_submission( $state );
         }
 
         $state['show_form'] = true;
@@ -766,14 +691,6 @@ class App extends BaseApp {
         if ( isset( $_GET['deleted'] ) ) {
             return 'Flight deleted.';
         }
-        if ( isset( $_GET['imported'] ) ) {
-            return sprintf(
-                'Import complete: %d created, %d updated, %d skipped.',
-                absint( $_GET['created'] ?? 0 ),
-                absint( $_GET['updated_count'] ?? 0 ),
-                absint( $_GET['skipped'] ?? 0 )
-            );
-        }
 
         return null;
     }
@@ -809,44 +726,8 @@ class App extends BaseApp {
         exit;
     }
 
-    private function handle_import_submission( array $state ): array {
-        $state['show_form'] = true;
-
-        if ( ! isset( $_POST[ self::NONCE_NAME ] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST[ self::NONCE_NAME ] ) ), self::NONCE_ACTION ) ) {
-            $state['errors'][] = 'Security check failed. Please try again.';
-            return $state;
-        }
-
-        $input = (string) wp_unslash( $_POST['legacy_import_json'] ?? '' );
-        $rows = $this->parse_import_rows( $input );
-        if ( is_wp_error( $rows ) ) {
-            $state['errors'][] = $rows->get_error_message();
-            return $state;
-        }
-
-        $result = $this->import_legacy_rows( $rows, ! empty( $_POST['update_existing'] ) );
-        if ( ! empty( $result['errors'] ) ) {
-            $state['flash'] = sprintf(
-                'Import partially complete: %d created, %d updated, %d skipped.',
-                $result['created'],
-                $result['updated'],
-                $result['skipped']
-            );
-            $state['errors'] = array_merge( $state['errors'], $result['errors'] );
-            return $state;
-        }
-
-        wp_safe_redirect( add_query_arg( [
-            'imported'      => '1',
-            'created'       => $result['created'],
-            'updated_count' => $result['updated'],
-            'skipped'       => $result['skipped'],
-        ], $this->remove_flash_query_args() ) );
-        exit;
-    }
-
     private function remove_flash_query_args(): string {
-        return remove_query_arg( [ 'updated', 'added', 'deleted', 'imported', 'created', 'updated_count', 'skipped' ] );
+        return remove_query_arg( [ 'updated', 'added', 'deleted' ] );
     }
 
     public function get_dashboard_data(): array {
@@ -920,146 +801,6 @@ class App extends BaseApp {
 
     public function flight_key( string $flightnr, string $date ): string {
         return rtrim( strtr( base64_encode( $flightnr . "\0" . $date ), '+/', '-_' ), '=' );
-    }
-
-    public function cli_import_legacy( array $args, array $assoc_args ): void {
-        $dry_run = ! empty( $assoc_args['dry-run'] );
-        $update_existing = ! empty( $assoc_args['update-existing'] );
-        $rows = $this->read_import_rows_from_stdin();
-
-        if ( is_wp_error( $rows ) ) {
-            \WP_CLI::error( $rows->get_error_message() );
-        }
-
-        $result = $this->import_legacy_rows( $rows, $update_existing, $dry_run );
-        foreach ( $result['errors'] as $error ) {
-            \WP_CLI::warning( $error );
-        }
-
-        $prefix = $dry_run ? 'Dry run: ' : '';
-        \WP_CLI::success( "{$prefix}{$result['created']} created, {$result['updated']} updated, {$result['skipped']} skipped." );
-    }
-
-    private function read_import_rows_from_stdin() {
-        return $this->parse_import_rows( stream_get_contents( STDIN ) );
-    }
-
-    private function parse_import_rows( string $input ) {
-        if ( '' === trim( $input ) ) {
-            return new \WP_Error( 'flight_log_no_import_data', 'No import data received.' );
-        }
-
-        $decoded = json_decode( $input, true );
-        if ( is_array( $decoded ) ) {
-            return $this->normalize_import_rows( $decoded );
-        }
-
-        $rows = [];
-        foreach ( preg_split( '/\R/', trim( $input ) ) as $line_number => $line ) {
-            if ( '' === trim( $line ) ) {
-                continue;
-            }
-
-            $row = json_decode( $line, true );
-            if ( ! is_array( $row ) ) {
-                return new \WP_Error( 'flight_log_invalid_import_json', 'Invalid JSON on input line ' . ( $line_number + 1 ) . '.' );
-            }
-
-            $rows[] = $row;
-        }
-
-        return $this->normalize_import_rows( $rows );
-    }
-
-    private function normalize_import_rows( array $rows ) {
-        if ( $this->is_phpmyadmin_json_export( $rows ) ) {
-            $rows = $this->extract_rows_from_phpmyadmin_json_export( $rows );
-            if ( is_wp_error( $rows ) ) {
-                return $rows;
-            }
-        }
-
-        if ( isset( $rows['date'], $rows['flightnr'] ) ) {
-            $rows = [ $rows ];
-        }
-
-        foreach ( $rows as $index => $row ) {
-            if ( ! is_array( $row ) ) {
-                return new \WP_Error( 'flight_log_invalid_import_row', 'Import row ' . ( $index + 1 ) . ' is not an object.' );
-            }
-            foreach ( [ 'date', 'flightnr', 'from', 'to' ] as $required_key ) {
-                if ( ! array_key_exists( $required_key, $row ) || '' === (string) $row[ $required_key ] ) {
-                    return new \WP_Error( 'flight_log_missing_import_field', 'Import row ' . ( $index + 1 ) . " is missing $required_key." );
-                }
-            }
-        }
-
-        return $rows;
-    }
-
-    private function is_phpmyadmin_json_export( array $rows ): bool {
-        return isset( $rows[0] )
-            && is_array( $rows[0] )
-            && isset( $rows[0]['type'] )
-            && 'header' === $rows[0]['type'];
-    }
-
-    private function extract_rows_from_phpmyadmin_json_export( array $export ) {
-        foreach ( $export as $entry ) {
-            if (
-                is_array( $entry )
-                && ( $entry['type'] ?? '' ) === 'table'
-                && ( $entry['name'] ?? '' ) === 'flights'
-                && isset( $entry['data'] )
-                && is_array( $entry['data'] )
-            ) {
-                return $entry['data'];
-            }
-        }
-
-        return new \WP_Error( 'flight_log_missing_phpmyadmin_table', 'Could not find the flights table data in the phpMyAdmin JSON export.' );
-    }
-
-    private function import_legacy_rows( array $rows, bool $update_existing = false, bool $dry_run = false ): array {
-        $result = [
-            'created' => 0,
-            'updated' => 0,
-            'skipped' => 0,
-            'errors'  => [],
-        ];
-
-        if ( ! $dry_run ) {
-            $this->prime_reference_names_for_rows( $rows );
-        }
-
-        foreach ( $rows as $index => $row ) {
-            $values = $this->legacy_row_to_values( $row );
-            if ( ! $this->parse_datetime_local( $values['date'] ) ) {
-                $result['errors'][] = 'Import row ' . ( $index + 1 ) . ' has an invalid date.';
-                $result['skipped']++;
-                continue;
-            }
-
-            $post_id = $this->find_flight_post_id( $values['flightnr'], $values['date'] );
-
-            if ( $post_id && ! $update_existing ) {
-                $result['skipped']++;
-                continue;
-            }
-
-            if ( ! $dry_run ) {
-                $saved = $this->save_flight( $values, $post_id );
-                if ( is_wp_error( $saved ) ) {
-                    $result['errors'][] = $saved->get_error_message();
-                    $result['skipped']++;
-                    continue;
-                }
-            }
-
-            $post_id ? $result['updated']++ : $result['created']++;
-        }
-
-        return $result;
     }
 
     private function get_flights(): array {
@@ -1200,7 +941,7 @@ class App extends BaseApp {
         foreach ( $this->empty_form_values() as $key => $default ) {
             update_post_meta( $saved, $this->meta_key( $key ), $values[ $key ] ?? '' );
         }
-        update_post_meta( $saved, $this->meta_key( 'legacy_key' ), $decorated['key'] );
+        update_post_meta( $saved, $this->meta_key( 'flight_key' ), $decorated['key'] );
         $this->assign_terms( $saved, $decorated );
 
         return $saved;
@@ -1224,22 +965,6 @@ class App extends BaseApp {
         }
     }
 
-    private function legacy_row_to_values( array $row ): array {
-        return [
-            'date'         => (string) $row['date'],
-            'flightnr'     => (string) $row['flightnr'],
-            'from'         => (string) $row['from'],
-            'to'           => (string) $row['to'],
-            'route'        => (string) ( $row['route'] ?? '' ),
-            'regnr'        => (string) ( $row['regnr'] ?? '' ),
-            'aircraft'     => (string) ( $row['aircraft'] ?? '' ),
-            'seat'         => (string) ( $row['seat'] ?? '' ),
-            'first_flight' => (string) ( $row['first_flight'] ?? '' ),
-            'msn'          => (string) ( $row['msn'] ?? '' ),
-            'remarks'      => (string) ( $row['remarks'] ?? '' ),
-        ];
-    }
-
     private function find_flight_post_id( string $flightnr, string $date ): int {
         $posts = get_posts( [
             'post_type'      => self::POST_TYPE,
@@ -1249,7 +974,7 @@ class App extends BaseApp {
             'no_found_rows'  => true,
             'meta_query'     => [
                 [
-                    'key'   => $this->meta_key( 'legacy_key' ),
+                    'key'   => $this->meta_key( 'flight_key' ),
                     'value' => $this->flight_key( $flightnr, $date ),
                 ],
             ],
