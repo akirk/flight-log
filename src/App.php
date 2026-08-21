@@ -14,11 +14,6 @@ class App extends BaseApp {
     private const AIRPORTS_CSV_URL = 'https://davidmegginson.github.io/ourairports-data/airports.csv';
     private const AIRLINES_CSV_URL = 'https://raw.githubusercontent.com/jpatokal/openflights/master/data/airlines.dat';
 
-    // Display names preferred over the legal names in the downloaded airline list.
-    private const AIRLINE_NAME_OVERRIDES = [
-        'DE' => 'Condor',
-    ];
-
     private const META_KEYS = [
         'flightnr',
         'date',
@@ -1282,7 +1277,7 @@ class App extends BaseApp {
             $row = str_getcsv( $line );
             $code = strtoupper( trim( (string) ( $row[3] ?? '' ) ) );
             if ( '' !== $code && isset( $wanted[ $code ] ) && ! isset( $names[ $code ] ) ) {
-                $names[ $code ] = self::AIRLINE_NAME_OVERRIDES[ $code ] ?? (string) ( $row[1] ?? $code );
+                $names[ $code ] = (string) ( $row[1] ?? $code );
             }
         }
 
@@ -1297,10 +1292,6 @@ class App extends BaseApp {
 
     private function airline_name( string $flightnr ): string {
         $code = strtoupper( substr( $flightnr, 0, 2 ) );
-        if ( isset( self::AIRLINE_NAME_OVERRIDES[ $code ] ) ) {
-            return self::AIRLINE_NAME_OVERRIDES[ $code ];
-        }
-
         $cache = $this->reference_names();
         if ( isset( $cache['airlines'][ $code ] ) ) {
             return $cache['airlines'][ $code ];
