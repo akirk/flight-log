@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Flight Log
  * Description: A private flight log and statistics app for WordPress.
- * Version: 1.0.0
+ * Version: 1.0.0+f9b8c5c39ce8
  * Author: Alex Kirk
  * Text Domain: flight-log
  * Tested up to: 7.1
