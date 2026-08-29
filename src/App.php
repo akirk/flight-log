@@ -50,7 +50,10 @@ class App extends BaseApp {
             'app_name'      => 'Flight Log',
             'require_login' => true,
             'launcher'      => 'Flight Log',
-            'app_icon'      => 'dashicons-airplane',
+            'app_icon'            => 'dashicons-airplane',
+            'app_icon_background' => 'linear-gradient(135deg, #2980b9, #6dd5fa)',
+            'app_icon_color'      => '#fff',
+            'app_icon_shadow'     => true,
             // Owned content: REST reads are gated with the app's capability and
             // OpenStation keeps these menus out of its dock.
             'post_types'    => [ self::POST_TYPE ],
