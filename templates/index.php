@@ -1,4 +1,8 @@
 <?php
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
 $app = \FlightLog\App::get_instance();
 if ( ! $app ) {
     wp_die( esc_html__( 'Flight Log is not initialized.', 'flight-log' ) );
@@ -38,6 +42,7 @@ $render_count_list = static function( string $title, array $counts, string $filt
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <?php // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- wp_app_title() returns an esc_html()'d string; escaping again would double-encode entities in the site name. ?>
     <title><?php echo wp_app_title( 'Flight Log' ); ?></title>
     <?php wp_app_head(); ?>
     <style>
