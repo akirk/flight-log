@@ -1,12 +1,17 @@
 <?php
 /**
  * Plugin Name: Flight Log
- * Description: A private flight log and statistics app for WordPress.
+ * Plugin URI: https://github.com/akirk/flight-log
+ * Description: Log the flights you take and see where you have been: routes, airlines, aircraft and airports, summarized in a private app on your own site.
  * Version: 1.0.0
- * Author: Alex Kirk
- * Text Domain: flight-log
+ * Requires at least: 6.0
  * Tested up to: 7.1
  * Requires PHP: 7.4
+ * Author: Alex Kirk
+ * Author URI: https://github.com/akirk
+ * License: GPL-2.0-or-later
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain: flight-log
  */
 
 namespace FlightLog;
