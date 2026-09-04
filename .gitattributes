@@ -1,0 +1,27 @@
+# Git/CI
+.git* export-ignore
+.github export-ignore
+
+# WordPress.org assets (deployed to the SVN assets/ directory, not shipped)
+.wordpress-org export-ignore
+
+# Agent/IDE
+.agents export-ignore
+.codex export-ignore
+
+# Testing
+tests export-ignore
+
+# Build/Dev
+composer.lock export-ignore
+
+# Dev vendors
+vendor/squizlabs export-ignore
+vendor/wp-coding-standards export-ignore
+vendor/**/test export-ignore
+vendor/**/tests export-ignore
+vendor/**/Test export-ignore
+vendor/**/Tests export-ignore
+
+# Misc
+.DS_Store export-ignore
