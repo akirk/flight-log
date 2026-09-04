@@ -11,8 +11,14 @@ class App extends BaseApp {
     public const NONCE_ACTION = 'flight_log_save_flight';
     public const NONCE_NAME = 'flight_log_nonce';
     private const REFERENCE_NAMES_OPTION = 'flight_log_reference_names';
+    // Public reference datasets used to resolve airport and airline codes into
+    // human readable names. Nothing is loaded into the browser from these hosts:
+    // the files are fetched server side with wp_remote_get(), parsed, and the
+    // handful of matching names is cached in an option. No images, scripts or
+    // styles are served from a remote host, so the offloading sniff below is a
+    // false positive on a plain data download.
     private const AIRPORTS_CSV_URL = 'https://davidmegginson.github.io/ourairports-data/airports.csv';
-    private const AIRLINES_CSV_URL = 'https://raw.githubusercontent.com/jpatokal/openflights/master/data/airlines.dat';
+    private const AIRLINES_CSV_URL = 'https://raw.githubusercontent.com/jpatokal/openflights/master/data/airlines.dat'; // phpcs:ignore PluginCheck.CodeAnalysis.Offloading.OffloadedContent -- Data file (airline reference data) fetched server side, not an offloaded asset.
 
     private const META_KEYS = [
         'flightnr',
@@ -134,12 +140,35 @@ class App extends BaseApp {
         ] );
     }
 
+    /**
+     * Translated taxonomy labels, keyed by taxonomy.
+     *
+     * Kept separate from self::TAXONOMIES so that every string passed to __()
+     * is a literal and can be picked up by the translation tooling.
+     */
+    private function taxonomy_labels(): array {
+        return [
+            'flight_log_airline'       => [ __( 'Airlines', 'flight-log' ), __( 'Airline', 'flight-log' ) ],
+            'flight_log_airport'       => [ __( 'Airports', 'flight-log' ), __( 'Airport', 'flight-log' ) ],
+            'flight_log_route'         => [ __( 'Routes', 'flight-log' ), __( 'Route', 'flight-log' ) ],
+            'flight_log_aircraft_type' => [ __( 'Aircraft Types', 'flight-log' ), __( 'Aircraft Type', 'flight-log' ) ],
+            'flight_log_manufacturer'  => [ __( 'Manufacturers', 'flight-log' ), __( 'Manufacturer', 'flight-log' ) ],
+            'flight_log_body_type'     => [ __( 'Body Types', 'flight-log' ), __( 'Body Type', 'flight-log' ) ],
+            'flight_log_year'          => [ __( 'Years', 'flight-log' ), __( 'Year', 'flight-log' ) ],
+            'flight_log_seat_position' => [ __( 'Seat Positions', 'flight-log' ), __( 'Seat Position', 'flight-log' ) ],
+            'flight_log_seat_side'     => [ __( 'Seat Sides', 'flight-log' ), __( 'Seat Side', 'flight-log' ) ],
+        ];
+    }
+
     public function register_taxonomies(): void {
-        foreach ( self::TAXONOMIES as $taxonomy => $labels ) {
+        $translated = $this->taxonomy_labels();
+
+        foreach ( self::TAXONOMIES as $taxonomy => $fallback ) {
+            $labels = $translated[ $taxonomy ] ?? $fallback;
             register_taxonomy( $taxonomy, self::POST_TYPE, [
                 'labels'            => [
-                    'name'          => __( $labels[0], 'flight-log' ),
-                    'singular_name' => __( $labels[1], 'flight-log' ),
+                    'name'          => $labels[0],
+                    'singular_name' => $labels[1],
                 ],
                 'public'            => false,
                 'show_ui'           => true,
@@ -662,7 +691,8 @@ class App extends BaseApp {
             'flash'             => $this->get_flash_message(),
         ];
 
-        if ( ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) !== 'POST' ) {
+        $request_method = isset( $_SERVER['REQUEST_METHOD'] ) ? strtoupper( sanitize_key( wp_unslash( $_SERVER['REQUEST_METHOD'] ) ) ) : 'GET';
+        if ( 'POST' !== $request_method ) {
             return $state;
         }
 
@@ -893,11 +923,30 @@ class App extends BaseApp {
         ] );
     }
 
+    /**
+     * Read a single submitted text field.
+     *
+     * The nonce for the form is verified in handle_form_submission() before any
+     * of these values reaches the database; this only reads them back so the
+     * form can be redisplayed, which is why the nonce sniff is silenced here.
+     */
+    private function posted_text( string $key ): string {
+        // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified in handle_form_submission() before any write; this only redisplays input.
+        return sanitize_text_field( wp_unslash( $_POST[ $key ] ?? '' ) );
+    }
+
+    /**
+     * Read a single submitted multi-line field. See posted_text().
+     */
+    private function posted_textarea( string $key ): string {
+        // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified in handle_form_submission() before any write; this only redisplays input.
+        return sanitize_textarea_field( wp_unslash( $_POST[ $key ] ?? '' ) );
+    }
+
     private function posted_form_values(): array {
         $values = $this->empty_form_values();
         foreach ( $values as $key => $default ) {
-            $raw = wp_unslash( $_POST[ $key ] ?? '' );
-            $values[ $key ] = 'remarks' === $key ? sanitize_textarea_field( $raw ) : sanitize_text_field( $raw );
+            $values[ $key ] = 'remarks' === $key ? $this->posted_textarea( $key ) : $this->posted_text( $key );
         }
 
         foreach ( [ 'flightnr', 'from', 'to', 'route', 'regnr', 'seat' ] as $key ) {
