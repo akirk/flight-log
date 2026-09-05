@@ -3,7 +3,7 @@
  * Plugin Name: Flight Log
  * Plugin URI: https://github.com/akirk/flight-log
  * Description: Log the flights you take and see where you have been: routes, airlines, aircraft and airports, summarized in a private app on your own site.
- * Version: 1.0.0
+ * Version: 1.0.0+cb08b12cd39b
  * Requires at least: 6.0
  * Tested up to: 7.1
  * Requires PHP: 7.4
