@@ -76,6 +76,7 @@ Yes, if the WordPress Abilities API is available. Flight Log registers abilities
 ## Screenshots
 
 1. The Flight Log dashboard: summary statistics, quick filters and the searchable flight table.
+2. The dashboard on a phone: the counts stack above the search field, and the flight table scrolls sideways.
 
 ## Changelog
 
