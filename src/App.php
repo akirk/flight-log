@@ -1,5 +1,5 @@
 <?php
-
+// phpcs:disable WordPress.Security.NonceVerification.Recommended,WordPress.DB.SlowDBQuery.slow_db_query_meta_key,WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Public filters are read-only and flight-log archive queries intentionally use metadata.
 namespace FlightLog;
 
 use DateTime;
