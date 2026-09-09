@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: Flight Log
- * Plugin URI: https://github.com/akirk/flight-log
+ * Plugin URI: https://wpapps.kirk.at/apps/flight-log/
  * Description: Log the flights you take and see where you have been: routes, airlines, aircraft and airports, summarized in a private app on your own site.
  * Version: 1.0.0
  * Requires at least: 6.0
