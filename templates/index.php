@@ -47,18 +47,20 @@ $render_count_list = static function( string $title, array $counts, string $filt
     <?php
     $flight_log_style_path  = dirname( __DIR__ ) . '/assets/css/index.css';
     $flight_log_script_path = dirname( __DIR__ ) . '/assets/js/index.js';
-    wp_enqueue_style(
+    wp_app_enqueue_style(
         'flight-log-index',
         plugins_url( 'assets/css/index.css', dirname( __DIR__ ) . '/flight-log.php' ),
         [],
-        file_exists( $flight_log_style_path ) ? (string) filemtime( $flight_log_style_path ) : false
+        file_exists( $flight_log_style_path ) ? (string) filemtime( $flight_log_style_path ) : false,
+        'flight-log'
     );
-    wp_enqueue_script(
+    wp_app_enqueue_script(
         'flight-log-index',
         plugins_url( 'assets/js/index.js', dirname( __DIR__ ) . '/flight-log.php' ),
         [],
         file_exists( $flight_log_script_path ) ? (string) filemtime( $flight_log_script_path ) : false,
-        true
+        true,
+        'flight-log'
     );
     ?>
     <?php wp_app_head(); ?>
