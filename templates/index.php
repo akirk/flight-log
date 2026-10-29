@@ -80,6 +80,16 @@ $render_count_list = static function( string $title, array $counts, string $filt
         </div>
     </header>
 
+    <details class="settings-menu panel">
+        <summary>Settings</summary>
+        <p>Choose where flight numbers and aircraft registrations link. Links open in a new tab.</p>
+        <div class="settings-fields">
+            <div class="field"><label for="provider-flightnr">Flight numbers</label><select id="provider-flightnr"></select></div>
+            <div class="field"><label for="provider-regnr">Aircraft registrations</label><select id="provider-regnr"></select></div>
+        </div>
+        <p id="provider-settings-status" role="status">Settings are saved automatically in this browser.</p>
+    </details>
+
     <?php if ( $form['flash'] ) : ?>
         <div class="notice"><?php echo esc_html( $form['flash'] ); ?></div>
     <?php endif; ?>

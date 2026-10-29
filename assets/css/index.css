@@ -75,6 +75,14 @@ th:last-child, td:last-child { border-right: 0; }
 tbody tr:nth-child(even) td { background: #fbfcfe; }
 tbody tr.is-future td { color: #98a2b3; }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; white-space: nowrap; }
+.provider-link { color: var(--accent); text-underline-offset: 3px; }
+.provider-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.settings-menu { margin-bottom: 14px; }
+.settings-menu > summary { color: var(--accent); cursor: pointer; font-weight: 800; }
+.settings-fields { display: flex; flex-wrap: wrap; gap: 16px; }
+.settings-fields .field { flex: 1 1 200px; }
+.settings-fields select { width: 100%; padding: 9px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); font: inherit; }
+.settings-menu p { color: var(--muted); margin-bottom: 0; }
 .row-edit { min-height: 28px; border: 1px solid var(--border); border-radius: 6px; background: #fff; color: var(--accent); cursor: pointer; font-weight: 800; padding: 4px 8px; }
 .empty { padding: 30px; color: var(--muted); text-align: center; }
 @media (max-width: 900px) {
