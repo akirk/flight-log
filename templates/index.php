@@ -55,9 +55,17 @@ $render_count_list = static function( string $title, array $counts, string $filt
         'flight-log'
     );
     wp_app_enqueue_script(
+        'flight-log-providers',
+        plugins_url( 'assets/js/providers.js', dirname( __DIR__ ) . '/flight-log.php' ),
+        [],
+        (string) filemtime( dirname( __DIR__ ) . '/assets/js/providers.js' ),
+        true,
+        'flight-log'
+    );
+    wp_app_enqueue_script(
         'flight-log-index',
         plugins_url( 'assets/js/index.js', dirname( __DIR__ ) . '/flight-log.php' ),
-        [],
+        [ 'flight-log-providers' ],
         file_exists( $flight_log_script_path ) ? (string) filemtime( $flight_log_script_path ) : false,
         true,
         'flight-log'
@@ -79,16 +87,6 @@ $render_count_list = static function( string $title, array $counts, string $filt
             <button type="button" class="button" id="add-flight-toggle"><?php echo $form['show_form'] ? esc_html__( 'Close form', 'flight-log' ) : esc_html__( 'Add flight', 'flight-log' ); ?></button>
         </div>
     </header>
-
-    <details class="settings-menu panel">
-        <summary>Settings</summary>
-        <p>Choose where flight numbers and aircraft registrations link. Links open in a new tab.</p>
-        <div class="settings-fields">
-            <div class="field"><label for="provider-flightnr">Flight numbers</label><select id="provider-flightnr"></select></div>
-            <div class="field"><label for="provider-regnr">Aircraft registrations</label><select id="provider-regnr"></select></div>
-        </div>
-        <p id="provider-settings-status" role="status">Settings are saved automatically in this browser.</p>
-    </details>
 
     <?php if ( $form['flash'] ) : ?>
         <div class="notice"><?php echo esc_html( $form['flash'] ); ?></div>

@@ -90,9 +90,15 @@ class App extends BaseApp {
 
     protected function setup_database(): void {}
 
-    protected function setup_routes(): void {}
+    protected function setup_routes(): void {
+        $this->app->route( '' );
+        $this->app->route( 'settings' );
+    }
 
-    protected function setup_menu(): void {}
+    protected function setup_menu(): void {
+        $this->app->add_menu_item( 'flights', __( 'Flights', 'flight-log' ), home_url( '/flight-log/' ) );
+        $this->app->add_menu_item( 'settings', __( 'Settings', 'flight-log' ), home_url( '/flight-log/settings/' ) );
+    }
 
     public static function require_login_for_rest( $result, $server, $request ) {
         if ( is_user_logged_in() ) {
