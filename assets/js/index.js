@@ -149,7 +149,7 @@ function restoreFiltersFromUrl() {
     const labels = {
         airport: 'Airports', country: 'Countries', airline: 'Airlines', airline_code: 'Airline code',
         aircraft: 'Aircraft', manufacturer: 'Manufacturers', aircraft_family: 'Aircraft families',
-        aircraft_type: 'Aircraft types', body_type: 'Body types', route_display: 'Routes',
+        aircraft_type: 'Aircraft types', body_type: 'Body types', age_bucket: 'Aircraft age', route_display: 'Routes',
         route_key: 'Legs', seat_position: 'Seat position', seat_side: 'Seat side', year: 'Years'
     };
     const key = params.get('filter');
