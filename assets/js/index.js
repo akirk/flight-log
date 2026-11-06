@@ -149,6 +149,7 @@ function renderRows() {
         ].forEach(([key, className]) => {
             const td = document.createElement('td');
             td.className = className;
+            if (key === 'seat' && flight.seat) td.title = text(flight.aircraft || flight.aircraft_type || 'Unknown aircraft');
             if ((key === 'from' || key === 'to') && flight[key]) {
                 const airport = document.createElement('button');
                 airport.type = 'button';

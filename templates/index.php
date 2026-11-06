@@ -36,7 +36,7 @@ $json_flights = array_map(
     $flights
 );
 
-$render_count_list = static function( string $title, array $counts, string $filter_key, string $id = '', bool $show_heading = true ): void {
+$render_count_list = static function( string $title, array $counts, string $filter_key, string $id = '', bool $show_heading = true, array $display_names = [] ): void {
     ?>
     <section class="panel summary-panel"<?php echo $id ? ' id="' . esc_attr( $id ) . '"' : ''; ?>>
         <?php if ( $show_heading ) : ?>
@@ -54,7 +54,7 @@ $render_count_list = static function( string $title, array $counts, string $filt
         <div class="count-list" id="count-list-<?php echo esc_attr( $filter_key ); ?>">
             <?php foreach ( $counts as $name => $count ) : ?>
                 <button type="button" class="count-row" data-filter-label="<?php echo esc_attr( $title ); ?>" data-filter-key="<?php echo esc_attr( $filter_key ); ?>" data-filter-value="<?php echo esc_attr( $name ); ?>">
-                    <span><?php echo esc_html( $name ); ?></span>
+                    <span><?php echo esc_html( $display_names[ $name ] ?? $name ); ?></span>
                     <strong><?php echo esc_html( (string) $count ); ?></strong>
                 </button>
             <?php endforeach; ?>
@@ -263,7 +263,10 @@ $render_count_list = static function( string $title, array $counts, string $filt
             <section class="panel grouping-panel" id="seat-filter-panel">
                 <h2>Seat</h2>
                 <p class="seat-filter-note">Estimated from seat letter and aircraft body type; airline and cabin layouts may vary.</p>
+                <h3>Position</h3>
                 <?php $render_count_list( 'Seat position', $summary['seat_pos'], 'seat_position', '', false ); ?>
+                <h3>Side</h3>
+                <?php $render_count_list( 'Seat side', $summary['seat_sides'], 'seat_side', '', false, [ 'Left' => 'Port', 'Right' => 'Starboard' ] ); ?>
             </section>
             <?php $render_count_list( 'Years', $summary['years'], 'year' ); ?>
         </section>
