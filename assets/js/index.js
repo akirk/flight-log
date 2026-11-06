@@ -163,6 +163,20 @@ document.getElementById('flight-delete').addEventListener('click', (event) => {
         event.target.value = event.target.value.toUpperCase();
     });
 });
+document.querySelectorAll('[data-aircraft-mode]').forEach((button) => {
+    button.addEventListener('click', () => {
+        document.querySelectorAll('[data-aircraft-mode]').forEach((mode) => {
+            mode.setAttribute('aria-pressed', String(mode === button));
+        });
+        document.querySelectorAll('[data-aircraft-expand]').forEach((expand) => {
+            expand.hidden = expand.dataset.aircraftExpand !== button.dataset.aircraftMode;
+        });
+        document.querySelectorAll('[data-aircraft-view]').forEach((view) => {
+            view.hidden = view.dataset.aircraftView !== button.dataset.aircraftMode;
+        });
+    });
+});
+
 document.querySelectorAll('[data-filter-key]').forEach((button) => {
     button.addEventListener('click', () => {
         applyFilter(button.dataset.filterKey, button.dataset.filterValue, button.dataset.filterLabel);
