@@ -10,10 +10,6 @@ const airportFilterOpen = document.getElementById('airport-filter-open');
 const airportFilterPanel = document.getElementById('airport-filter-panel');
 const fields = ['date', 'flightnr', 'from', 'to', 'route', 'regnr', 'aircraft', 'seat', 'first_flight', 'msn', 'remarks'];
 
-function text(value) {
-    return value == null ? '' : String(value);
-}
-
 function setFormOpen(open) {
     form.classList.toggle('hidden', !open);
     toggle.textContent = open ? 'Close form' : 'Add flight';
@@ -79,7 +75,7 @@ function renderRows() {
         ].forEach(([key, className]) => {
             const td = document.createElement('td');
             td.className = className;
-            td.textContent = text(flight[key]);
+            appendProviderLinks(td, key, flight[key]);
             tr.append(td);
         });
         const action = document.createElement('td');

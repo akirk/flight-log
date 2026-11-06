@@ -21,6 +21,8 @@ From those entries the app derives everything else. Airport and airline codes ar
 
 The dashboard shows totals for logged flights, planned flights, distinct airports, routes and aircraft, plus ranked breakdowns by airline, airport, route, aircraft type, body type and year. Every one of those breakdowns is clickable and filters the flight table below it, and there is a free-text search across the whole log. Flights can be edited or deleted from the same form.
 
+Flight numbers and aircraft registrations link directly to your chosen provider in a new tab. Open Settings from the WpApp masterbar menu to choose Flightradar24 for flight numbers, and Airfleets or Flightradar24 for registrations, or disable links for either field. Defaults are Flightradar24 for flight numbers and Airfleets for registrations. Preferences save automatically in the current browser. Providers are contacted only when you follow a link. These are flight-number history and registration lookups, rather than links to a specific dated flight.
+
 Everything is stored with plain WordPress building blocks: a `tracked_flight` custom post type with REST-enabled post meta, and taxonomies for airlines, airports, routes, aircraft types, manufacturers, body types, years, seat positions and seat sides. No custom database tables are created, so removing the plugin leaves your database as it was.
 
 Airport and airline names are looked up on demand from two public open-data reference files — the OurAirports airport dataset and the OpenFlights airline dataset. Only the codes you actually use are looked up, the results are cached in a single option, and the lookup happens on the server; nothing on the page is loaded from a remote host.

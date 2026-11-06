@@ -55,9 +55,17 @@ $render_count_list = static function( string $title, array $counts, string $filt
         'flight-log'
     );
     wp_app_enqueue_script(
+        'flight-log-providers',
+        plugins_url( 'assets/js/providers.js', dirname( __DIR__ ) . '/flight-log.php' ),
+        [],
+        (string) filemtime( dirname( __DIR__ ) . '/assets/js/providers.js' ),
+        true,
+        'flight-log'
+    );
+    wp_app_enqueue_script(
         'flight-log-index',
         plugins_url( 'assets/js/index.js', dirname( __DIR__ ) . '/flight-log.php' ),
-        [],
+        [ 'flight-log-providers' ],
         file_exists( $flight_log_script_path ) ? (string) filemtime( $flight_log_script_path ) : false,
         true,
         'flight-log'
