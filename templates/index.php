@@ -237,8 +237,9 @@ $render_count_list = static function( string $title, array $counts, string $filt
                         <button type="button" data-grouping-mode="manufacturer" aria-pressed="false" aria-controls="aircraft-mode-manufacturer" aria-label="Manufacturer">Make</button>
                         <button type="button" data-grouping-mode="family" aria-pressed="false" aria-controls="aircraft-mode-family">Family</button>
                         <button type="button" data-grouping-mode="type" aria-pressed="true" aria-controls="aircraft-mode-type">Type</button>
+                        <button type="button" data-grouping-mode="body" aria-pressed="false" aria-controls="aircraft-mode-body">Body</button>
                     </div>
-                    <?php foreach ( [ 'manufacturer' => [ 'manufacturers', 'manufacturer' ], 'family' => [ 'families', 'aircraft_family' ], 'type' => [ 'types', 'aircraft_type' ] ] as $mode => $group ) : ?>
+                    <?php foreach ( [ 'manufacturer' => [ 'manufacturers', 'manufacturer' ], 'family' => [ 'families', 'aircraft_family' ], 'type' => [ 'types', 'aircraft_type' ], 'body' => [ 'body_types', 'body_type' ] ] as $mode => $group ) : ?>
                         <?php if ( count( $summary[ $group[0] ] ) > 12 ) : ?>
                             <button type="button" class="count-list-toggle grouping-list-toggle" data-grouping-expand="<?php echo esc_attr( $mode ); ?>" aria-expanded="false" aria-controls="count-list-<?php echo esc_attr( $group[1] ); ?>"<?php echo 'type' !== $mode ? ' hidden' : ''; ?>>
                                 <span class="count-list-hint">Show all (<?php echo esc_html( (string) count( $summary[ $group[0] ] ) ); ?>)</span>
@@ -255,8 +256,15 @@ $render_count_list = static function( string $title, array $counts, string $filt
                 <div id="aircraft-mode-type" data-grouping-view="type">
                     <?php $render_count_list( 'Aircraft types', $summary['types'], 'aircraft_type', '', false ); ?>
                 </div>
+                <div id="aircraft-mode-body" data-grouping-view="body" hidden>
+                    <?php $render_count_list( 'Body types', $summary['body_types'], 'body_type', '', false ); ?>
+                </div>
             </section>
-            <?php $render_count_list( 'Body types', $summary['body_types'], 'body_type' ); ?>
+            <section class="panel grouping-panel" id="seat-filter-panel">
+                <h2>Seat</h2>
+                <p class="seat-filter-note">Estimated from seat letter and aircraft body type; airline and cabin layouts may vary.</p>
+                <?php $render_count_list( 'Seat position', $summary['seat_pos'], 'seat_position', '', false ); ?>
+            </section>
             <?php $render_count_list( 'Years', $summary['years'], 'year' ); ?>
         </section>
     </details>
