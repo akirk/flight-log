@@ -161,6 +161,9 @@ echo "Seat layout override validation, classification, fallback and removal chec
 $expect( $invoke( 'seat_info', '25Z', 'Widebody' ), [ 'position' => 'Unknown', 'side' => 'Unknown' ] );
 $expect( $invoke( 'seat_info', '25I', 'Widebody' ), [ 'position' => 'Unknown', 'side' => 'Unknown' ] );
 $expect( $invoke( 'seat_info', '25J', 'Widebody' ), [ 'position' => 'Middle', 'side' => 'Right' ] );
+$expect( $invoke( 'seat_info', '25L', 'Widebody', 'ABC|DEFG|JKL' ), [ 'position' => 'Window', 'side' => 'Right' ] );
+$expect( $invoke( 'seat_info', '25J', 'Widebody', 'ABC|DEFG|JKL' ), [ 'position' => 'Aisle', 'side' => 'Right' ] );
+$expect( $invoke( 'seat_info', '25K', 'Widebody', 'ABC|DEFG|JKL' ), [ 'position' => 'Middle', 'side' => 'Right' ] );
 $expect( $invoke( 'seat_info', '25L', 'Widebody' ), [ 'position' => 'Window', 'side' => 'Right' ] );
 $expect( $app->automatic_seat_description( 'Widebody' ), "2–4–2: AC | DEFG | HK\n3–4–3: ABC | DEFG | HJK" );
 echo "Widebody automatic seat rules and description checks passed.\n";

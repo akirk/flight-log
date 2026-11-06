@@ -33,11 +33,20 @@ function showFilterPanel(key) {
     workspace.classList.add('is-filtering');
     filterPanel.open = false;
     // Select the matching grouping view when filtering from a flight row.
-    const mode = {airport: 'airport', country: 'country', route_display: 'route', route_key: 'leg', manufacturer: 'manufacturer', aircraft_family: 'family', aircraft_type: 'type', body_type: 'body'}[key];
+    const mode = {airport: 'airport', country: 'country', route_display: 'route', route_key: 'leg', manufacturer: 'manufacturer', aircraft_family: 'family', aircraft_type: 'type', body_type: 'body', age_bucket: 'age'}[key];
     if (mode) {
         const modeButton = card.querySelector(`[data-grouping-mode="${mode}"]`);
         const visibleView = card.querySelector('[data-grouping-view]:not([hidden])');
         if (modeButton && (!visibleView || !visibleView.querySelector(`[data-filter-key="${key}"][data-filter-value="${CSS.escape(activeFilter.value)}"]`))) modeButton.click();
+    }
+    const selected = card.querySelector(`[data-filter-key="${key}"][data-filter-value="${CSS.escape(activeFilter.value)}"]`);
+    const list = selected && selected.closest('.count-list');
+    if (list && !list.classList.contains('is-expanded')) {
+        const item = selected.closest('.count-row');
+        if (item && item.parentElement === list && Array.from(list.children).indexOf(item) >= 12) {
+            const expand = Array.from(card.querySelectorAll('.count-list-toggle')).find((button) => button.getAttribute('aria-controls') === list.id);
+            if (expand) expand.click();
+        }
     }
     if (changed) workspace.scrollIntoView({block: 'start', behavior: 'smooth'});
 }

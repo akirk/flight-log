@@ -170,3 +170,5 @@ tbody tr.is-future td { color: #98a2b3; }
 
 .reference-seat-maps { display: block; margin-top: 6px; }
 .reference-seat-maps a { display: inline; margin-left: 6px; white-space: nowrap; }
+
+.aircraft-body-label { display: inline-block; margin-left: 5px; padding: 1px 4px; border-radius: 3px; background: var(--surface-soft); color: var(--muted); font-size: 10px; font-weight: 400; vertical-align: middle; }
