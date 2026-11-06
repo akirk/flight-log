@@ -47,6 +47,7 @@ input, textarea { width: 100%; border: 1px solid var(--border); border-radius: 6
 textarea { min-height: 76px; resize: vertical; }
 input:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(15, 118, 110, .15); outline: 0; }
 .form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
+#flight-delete { order: -1; margin-right: auto; }
 .overview { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
 .stat { border: 1px solid var(--border); border-radius: 8px; background: var(--surface); padding: 13px; }
 .stat-button { width: 100%; color: inherit; cursor: pointer; text-align: left; }
