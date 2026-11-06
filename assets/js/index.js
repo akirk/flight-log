@@ -65,6 +65,8 @@ function matches(flight) {
     if (activeFilter) {
         if (activeFilter.key === 'airport') {
             if (![flight.from_airport, flight.to_airport, flight.from, flight.to].map(text).includes(activeFilter.value)) return false;
+        } else if (activeFilter.key === 'country') {
+            if (![flight.from_country, flight.to_country].map(text).includes(activeFilter.value)) return false;
         } else if (text(flight[activeFilter.key]) !== activeFilter.value) {
             return false;
         }
@@ -163,22 +165,24 @@ document.getElementById('flight-delete').addEventListener('click', (event) => {
         event.target.value = event.target.value.toUpperCase();
     });
 });
-document.querySelectorAll('[data-aircraft-mode]').forEach((button) => {
+document.querySelectorAll('[data-grouping-mode]').forEach((button) => {
+    const panel = button.closest('[data-grouping-filter]');
     button.addEventListener('click', () => {
-        document.querySelectorAll('[data-aircraft-mode]').forEach((mode) => {
+        panel.querySelectorAll('[data-grouping-mode]').forEach((mode) => {
             mode.setAttribute('aria-pressed', String(mode === button));
         });
-        document.querySelectorAll('[data-aircraft-expand]').forEach((expand) => {
-            expand.hidden = expand.dataset.aircraftExpand !== button.dataset.aircraftMode;
+        panel.querySelectorAll('[data-grouping-expand]').forEach((expand) => {
+            expand.hidden = expand.dataset.groupingExpand !== button.dataset.groupingMode;
         });
-        document.querySelectorAll('[data-aircraft-view]').forEach((view) => {
-            view.hidden = view.dataset.aircraftView !== button.dataset.aircraftMode;
+        panel.querySelectorAll('[data-grouping-view]').forEach((view) => {
+            view.hidden = view.dataset.groupingView !== button.dataset.groupingMode;
         });
     });
 });
 
 document.querySelectorAll('[data-filter-key]').forEach((button) => {
-    button.addEventListener('click', () => {
+    button.addEventListener('click', (event) => {
+        event.preventDefault();
         applyFilter(button.dataset.filterKey, button.dataset.filterValue, button.dataset.filterLabel);
     });
 });

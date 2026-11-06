@@ -816,6 +816,7 @@ class App extends BaseApp {
             'logged'      => 0,
             'planned'     => 0,
             'airports'    => [],
+            'countries'   => [],
             'airlines'    => [],
             'routes'      => [],
             'aircraft'    => [],
@@ -835,6 +836,9 @@ class App extends BaseApp {
 
             $this->count( $summary['airports'], $flight['from_airport'] );
             $this->count( $summary['airports'], $flight['to_airport'] );
+            foreach ( array_unique( [ $flight['from_country'], $flight['to_country'] ] ) as $country ) {
+                $this->count( $summary['countries'], $country );
+            }
             $this->count( $summary['airlines'], $flight['airline'] );
             $this->count( $summary['routes'], $flight['route_key'] );
             $this->count( $summary['aircraft'], $flight['regnr'] ?: $flight['aircraft'] ?: 'Unknown' );
@@ -895,6 +899,20 @@ class App extends BaseApp {
             'no_found_rows'  => true,
         ] );
 
+        // Backfill countries for airports cached before country grouping existed.
+        $codes = [];
+        foreach ( $posts as $post ) {
+            $codes[] = (string) get_post_meta( $post->ID, $this->meta_key( 'from' ), true );
+            $codes[] = (string) get_post_meta( $post->ID, $this->meta_key( 'to' ), true );
+        }
+        $cache = $this->reference_names();
+        if ( $this->missing_reference_codes( $codes, $cache['airport_countries'] ) && ! get_transient( 'flight_log_country_lookup_retry' ) ) {
+            $result = $this->prime_reference_names( $codes, [] );
+            if ( is_wp_error( $result ) ) {
+                set_transient( 'flight_log_country_lookup_retry', true, HOUR_IN_SECONDS );
+            }
+        }
+
         return array_map( [ $this, 'post_to_flight' ], $posts );
     }
 
@@ -931,7 +949,9 @@ class App extends BaseApp {
             'route_display'  => $route,
             'airline'        => $airline,
             'from_airport'   => $from_airport,
+            'from_country'   => $this->airport_country( $values['from'] ),
             'to_airport'     => $to_airport,
+            'to_country'     => $this->airport_country( $values['to'] ),
             'manufacturer'   => $manufacturer ?: 'Unknown',
             'aircraft_type'  => $aircraft_type,
             'aircraft_family' => $this->aircraft_family( $aircraft_type ),
@@ -1269,11 +1289,15 @@ class App extends BaseApp {
 
     private function prime_reference_names( array $airport_codes, array $airline_codes ) {
         $cache = $this->reference_names();
-        $airport_codes = $this->missing_reference_codes( $airport_codes, $cache['airports'] );
+        $airport_codes = array_values( array_unique( array_merge(
+            $this->missing_reference_codes( $airport_codes, $cache['airports'] ),
+            $this->missing_reference_codes( $airport_codes, $cache['airport_countries'] )
+        ) ) );
         $airline_codes = $this->missing_reference_codes( $airline_codes, $cache['airlines'] );
 
         if ( $airport_codes ) {
-            $airport_names = $this->download_airport_names( $airport_codes );
+            $airport_countries = [];
+            $airport_names = $this->download_airport_names( $airport_codes, $airport_countries );
             if ( is_wp_error( $airport_names ) ) {
                 return $airport_names;
             }
@@ -1283,6 +1307,7 @@ class App extends BaseApp {
                 }
             }
             $cache['airports'] = array_merge( $cache['airports'], $airport_names );
+            $cache['airport_countries'] = array_merge( $cache['airport_countries'], $airport_countries );
         }
 
         if ( $airline_codes ) {
@@ -1308,8 +1333,15 @@ class App extends BaseApp {
 
     private function reference_names(): array {
         $cache = get_option( self::REFERENCE_NAMES_OPTION, [] );
+        // Discard airport lookups made with the old local-code matching rules.
+        if ( 2 !== ( $cache['airport_lookup_version'] ?? 0 ) ) {
+            $cache['airports'] = [];
+            $cache['airport_countries'] = [];
+        }
 
         return [
+            'airport_lookup_version' => 2,
+            'airport_countries' => isset( $cache['airport_countries'] ) && is_array( $cache['airport_countries'] ) ? $cache['airport_countries'] : [],
             'airports' => isset( $cache['airports'] ) && is_array( $cache['airports'] ) ? $cache['airports'] : [],
             'airlines' => isset( $cache['airlines'] ) && is_array( $cache['airlines'] ) ? $cache['airlines'] : [],
         ];
@@ -1335,7 +1367,7 @@ class App extends BaseApp {
         return $subset;
     }
 
-    private function download_airport_names( array $codes ) {
+    private function download_airport_names( array $codes, array &$countries = [] ) {
         $response = wp_remote_get( self::AIRPORTS_CSV_URL, [ 'timeout' => 20 ] );
         if ( is_wp_error( $response ) ) {
             return $response;
@@ -1350,6 +1382,8 @@ class App extends BaseApp {
         $columns = array_flip( $header );
         $names = [];
         $wanted = array_flip( $codes );
+        $countries = array_fill_keys( $codes, '' );
+        $priorities = [];
 
         foreach ( $lines as $line ) {
             if ( '' === trim( $line ) ) {
@@ -1357,11 +1391,14 @@ class App extends BaseApp {
             }
 
             $row = str_getcsv( $line );
-            foreach ( [ 'iata_code', 'icao_code', 'ident', 'gps_code', 'local_code' ] as $column ) {
+            // IATA wins across all rows; only explicit ICAO codes are fallbacks.
+            foreach ( [ 'iata_code' => 2, 'icao_code' => 1 ] as $column => $priority ) {
                 $code = strtoupper( trim( (string) ( $row[ $columns[ $column ] ?? -1 ] ?? '' ) ) );
-                if ( '' !== $code && isset( $wanted[ $code ] ) && ! isset( $names[ $code ] ) ) {
+                if ( '' !== $code && isset( $wanted[ $code ] ) && $priority > ( $priorities[ $code ] ?? 0 ) ) {
                     $name = (string) ( $row[ $columns['name'] ?? -1 ] ?? '' );
+                    $priorities[ $code ] = $priority;
                     $names[ $code ] = trim( $code . ' - ' . $name );
+                    $countries[ $code ] = (string) ( $row[ $columns['iso_country'] ?? -1 ] ?? '' );
                 }
             }
         }
@@ -1393,6 +1430,17 @@ class App extends BaseApp {
         }
 
         return $names;
+    }
+
+    private function airport_country( string $code ): string {
+        static $names = null;
+        if ( null === $names ) {
+            // Country names from OurAirports, matching the airport dataset's ISO codes.
+            $names = json_decode( file_get_contents( dirname( __DIR__ ) . '/data/countries.json' ), true ) ?: [];
+        }
+        $cache = $this->reference_names();
+        $country = $cache['airport_countries'][ strtoupper( trim( $code ) ) ] ?? '';
+        return $names[ $country ] ?? ( $country ?: 'Unknown' );
     }
 
     private function airport_name( string $code ): string {
