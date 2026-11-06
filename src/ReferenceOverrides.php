@@ -87,7 +87,7 @@ class ReferenceOverrides {
                 wp_die( 'Please log in to save settings.', '', [ 'response' => 403 ] );
             }
             check_admin_referer( 'flight_log_save_references' );
-            $submitted = isset( $_POST['references'] ) && is_array( $_POST['references'] ) ? wp_unslash( $_POST['references'] ) : [];
+            $submitted = isset( $_POST['references'] ) && is_array( $_POST['references'] ) ? map_deep( wp_unslash( $_POST['references'] ), 'sanitize_text_field' ) : [];
             try {
                 $values = self::validate( $submitted );
                 $saved = update_user_meta( get_current_user_id(), self::META_KEY, $values );
