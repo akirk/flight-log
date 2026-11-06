@@ -152,7 +152,7 @@ function renderRows() {
             if (key === 'seat' && flight.seat) {
                 const position = text(flight.seat_position || 'Unknown');
                 const bodyType = text(flight.body_type || 'Unknown').toLowerCase();
-                td.title = `${position} on ${bodyType === 'unknown' ? 'an unknown aircraft type' : `a ${bodyType}`}`;
+                td.title = `${position} on this ${bodyType === 'unknown' ? 'aircraft (type unknown)' : bodyType}`;
             }
             if ((key === 'from' || key === 'to') && flight[key]) {
                 const airport = document.createElement('button');
