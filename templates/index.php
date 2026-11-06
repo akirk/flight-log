@@ -237,6 +237,13 @@ $render_count_list = static function( string $title, array $counts, string $filt
         </section>
     </details>
 
+    <div class="flight-workspace" id="flight-workspace">
+        <aside class="filter-sidebar" id="filter-sidebar" aria-label="Active filter" hidden>
+            <button type="button" class="button secondary" id="browse-filters">All filters</button>
+            <div id="active-filter-panel"></div>
+        </aside>
+        <div class="flight-results">
+            <p class="filter-results-status" id="filter-results-status" role="status" aria-live="polite"></p>
     <section class="table-panel">
         <div class="table-scroll">
             <table>
@@ -263,6 +270,8 @@ $render_count_list = static function( string $title, array $counts, string $filt
             <?php endif; ?>
         </div>
     </section>
+        </div>
+    </div>
 </main>
 <?php wp_app_body_close(); ?>
 </body>
