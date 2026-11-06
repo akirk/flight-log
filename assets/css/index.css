@@ -53,6 +53,7 @@ input:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px
 .stat-button:hover, .stat-button:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(15, 118, 110, .16); outline: 0; }
 .stat span { display: block; color: var(--muted); font-size: 12px; font-weight: 800; text-transform: uppercase; }
 .stat strong { display: block; margin-top: 5px; font-size: 24px; line-height: 1.1; }
+.stat small { color: var(--muted); font-size: 16px; font-weight: 400; }
 .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 14px; }
 .toolbar input { flex: 1 1 260px; max-width: 420px; }
 .active-filter { color: var(--muted); font-weight: 800; }
