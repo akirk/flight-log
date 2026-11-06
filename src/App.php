@@ -93,10 +93,12 @@ class App extends BaseApp {
     protected function setup_routes(): void {
         $this->app->route( '' );
         $this->app->route( 'settings' );
+        $this->app->route( 'reference-data' );
     }
 
     protected function setup_menu(): void {
         $this->app->add_menu_item( 'flights', __( 'Flights', 'flight-log' ), home_url( '/flight-log/' ) );
+        $this->app->add_menu_item( 'reference-data', __( 'Overrides', 'flight-log' ), home_url( '/flight-log/reference-data/' ) );
         $this->app->add_menu_item( 'settings', __( 'Settings', 'flight-log' ), home_url( '/flight-log/settings/' ) );
     }
 
@@ -1439,19 +1441,26 @@ class App extends BaseApp {
             $names = json_decode( file_get_contents( dirname( __DIR__ ) . '/data/countries.json' ), true ) ?: [];
         }
         $cache = $this->reference_names();
-        $country = $cache['airport_countries'][ strtoupper( trim( $code ) ) ] ?? '';
+        $code = strtoupper( trim( $code ) );
+        $override = ReferenceOverrides::settings()['airports'][ $code ] ?? [];
+        $country = ! empty( $override['country'] ) ? $override['country'] : ( $cache['airport_countries'][ $code ] ?? '' );
         return $names[ $country ] ?? ( $country ?: 'Unknown' );
     }
 
     private function airport_name( string $code ): string {
         $code = strtoupper( trim( $code ) );
         $cache = $this->reference_names();
-        return $cache['airports'][ $code ] ?? ( $code ?: 'Unknown' );
+        $override = ReferenceOverrides::settings()['airports'][ $code ] ?? [];
+        return ! empty( $override['name'] ) ? $code . ' - ' . $override['name'] : ( $cache['airports'][ $code ] ?? ( $code ?: 'Unknown' ) );
     }
 
     private function airline_name( string $flightnr ): string {
         $code = strtoupper( substr( $flightnr, 0, 2 ) );
         $cache = $this->reference_names();
+        $override = ReferenceOverrides::settings()['airlines'][ $code ] ?? [];
+        if ( ! empty( $override['name'] ) ) {
+            return $override['name'];
+        }
         if ( isset( $cache['airlines'][ $code ] ) ) {
             return $cache['airlines'][ $code ];
         }

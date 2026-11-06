@@ -31,7 +31,11 @@ $flight_log_provider_settings = \FlightLog\Providers::settings();
         </div>
         <a class="button secondary" href="<?php echo esc_url( home_url( '/flight-log/' ) ); ?>">Back to flights</a>
     </header>
-    <form method="post" class="panel settings-panel" aria-labelledby="provider-settings-title">
+        <?php if ( isset( $_GET['saved'] ) && '1' === $_GET['saved'] ) : // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only success notice. ?>
+            <p class="notice" role="status">Settings saved.</p>
+        <?php endif; ?>
+    <form method="post" class="settings-form" aria-labelledby="provider-settings-title">
+        <div class="panel settings-panel">
         <h2 id="provider-settings-title">Provider links</h2>
         <p>Choose where flight numbers and aircraft registrations link. Links open in a new tab.</p>
         <?php wp_nonce_field( 'flight_log_save_providers' ); ?>
@@ -47,9 +51,7 @@ $flight_log_provider_settings = \FlightLog\Providers::settings();
                 </div>
             <?php endforeach; ?>
         </div>
-        <?php if ( isset( $_GET['saved'] ) && '1' === $_GET['saved'] ) : // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only success notice. ?>
-            <p class="notice" role="status">Settings saved.</p>
-        <?php endif; ?>
+        </div>
         <button type="submit" class="button">Save settings</button>
     </form>
 </main>

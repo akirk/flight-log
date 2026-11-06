@@ -61,6 +61,11 @@ class Providers {
             } else {
                 if ( 'flightnr' === $key && preg_match( '/^([A-Z0-9]{2})(\d.*)$/', $identifier, $parts ) ) {
                     $codes = self::airline_codes();
+                    foreach ( ReferenceOverrides::settings()['airlines'] as $code => $override ) {
+                        if ( ! empty( $override['icao'] ) ) {
+                            $codes[ $code ] = $override['icao'];
+                        }
+                    }
                     if ( empty( $codes[ $parts[1] ] ) ) {
                         continue;
                     }
