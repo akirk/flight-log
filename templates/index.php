@@ -148,9 +148,12 @@ $render_count_list = static function( string $title, array $counts, string $filt
     </form>
 
     <section class="overview" aria-label="Flight log summary" data-ai-assistant-important>
-        <div class="stat"><span>Logged flights</span><strong><?php echo esc_html( (string) $summary['logged'] ); ?></strong></div>
+        <div class="stat">
+            <span>Flights</span>
+            <strong><?php echo esc_html( (string) $summary['logged'] ); ?> <small title="<?php echo esc_attr( $summary['planned'] . ' upcoming flights' ); ?>" aria-label="<?php echo esc_attr( $summary['planned'] . ' upcoming flights' ); ?>">(<?php echo esc_html( (string) $summary['planned'] ); ?>)</small></strong>
+        </div>
         <button type="button" class="stat stat-button" id="airport-filter-open"><span>Airports</span><strong><?php echo esc_html( (string) count( $summary['airports'] ) ); ?></strong></button>
-        <div class="stat"><span>Routes</span><strong><?php echo esc_html( (string) count( $summary['routes'] ) ); ?></strong></div>
+        <button type="button" class="stat stat-button" id="route-filter-open"><span>Routes</span><strong><?php echo esc_html( (string) count( $summary['routes'] ) ); ?></strong></button>
         <button type="button" class="stat stat-button" id="aircraft-filter-open"><span>Aircraft</span><strong><?php echo esc_html( (string) count( $summary['aircraft'] ) ); ?></strong></button>
     </section>
 
@@ -205,7 +208,28 @@ $render_count_list = static function( string $title, array $counts, string $filt
                     </div>
                 </div>
             </section>
-            <?php $render_count_list( 'Routes', $summary['routes'], 'route_key' ); ?>
+            <section class="panel grouping-panel" id="route-filter-panel" data-grouping-filter>
+                <div class="grouping-filter-header">
+                    <h2>Routes</h2>
+                    <div class="grouping-modes" role="group" aria-label="Group flights by">
+                        <button type="button" data-grouping-mode="route" aria-pressed="true" aria-controls="route-mode-route">Route</button>
+                        <button type="button" data-grouping-mode="leg" aria-pressed="false" aria-controls="route-mode-leg">Leg</button>
+                    </div>
+                    <?php foreach ( [ 'route' => [ 'routes', 'route_display' ], 'leg' => [ 'legs', 'route_key' ] ] as $mode => $group ) : ?>
+                        <?php if ( count( $summary[ $group[0] ] ) > 12 ) : ?>
+                            <button type="button" class="count-list-toggle grouping-list-toggle" data-grouping-expand="<?php echo esc_attr( $mode ); ?>" aria-expanded="false" aria-controls="count-list-<?php echo esc_attr( $group[1] ); ?>"<?php echo 'route' !== $mode ? ' hidden' : ''; ?>>
+                                <span class="count-list-hint">Show all (<?php echo esc_html( (string) count( $summary[ $group[0] ] ) ); ?>)</span>
+                            </button>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
+                </div>
+                <div id="route-mode-route" data-grouping-view="route">
+                    <?php $render_count_list( 'Routes', $summary['routes'], 'route_display', '', false ); ?>
+                </div>
+                <div id="route-mode-leg" data-grouping-view="leg" hidden>
+                    <?php $render_count_list( 'Legs', $summary['legs'], 'route_key', '', false ); ?>
+                </div>
+            </section>
             <section class="panel grouping-panel" id="aircraft-filter-panel" data-grouping-filter>
                 <div class="grouping-filter-header">
                     <h2>Aircraft</h2>

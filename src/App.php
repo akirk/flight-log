@@ -531,6 +531,7 @@ class App extends BaseApp {
                         'airports'   => [ 'type' => 'object' ],
                         'airlines'   => [ 'type' => 'object' ],
                         'routes'     => [ 'type' => 'object' ],
+                        'legs'       => [ 'type' => 'object' ],
                         'aircraft'   => [ 'type' => 'object' ],
                         'types'      => [ 'type' => 'object' ],
                         'body_types' => [ 'type' => 'object' ],
@@ -821,6 +822,7 @@ class App extends BaseApp {
             'countries'   => [],
             'airlines'    => [],
             'routes'      => [],
+            'legs'        => [],
             'aircraft'    => [],
             'types'       => [],
             'manufacturers' => [],
@@ -842,7 +844,8 @@ class App extends BaseApp {
                 $this->count( $summary['countries'], $country );
             }
             $this->count( $summary['airlines'], $flight['airline'] );
-            $this->count( $summary['routes'], $flight['route_key'] );
+            $this->count( $summary['routes'], $flight['route_display'] );
+            $this->count( $summary['legs'], $flight['route_key'] );
             $this->count( $summary['aircraft'], $flight['regnr'] ?: $flight['aircraft'] ?: 'Unknown' );
             $this->count( $summary['types'], $flight['aircraft_type'] );
             $this->count( $summary['manufacturers'], $flight['manufacturer'] );

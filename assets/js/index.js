@@ -33,7 +33,7 @@ function showFilterPanel(key) {
     workspace.classList.add('is-filtering');
     filterPanel.open = false;
     // Select the matching grouping view when filtering from a flight row.
-    const mode = {airport: 'airport', country: 'country', manufacturer: 'manufacturer', aircraft_family: 'family', aircraft_type: 'type'}[key];
+    const mode = {airport: 'airport', country: 'country', route_display: 'route', route_key: 'leg', manufacturer: 'manufacturer', aircraft_family: 'family', aircraft_type: 'type'}[key];
     if (mode) {
         const modeButton = card.querySelector(`[data-grouping-mode="${mode}"]`);
         const visibleView = card.querySelector('[data-grouping-view]:not([hidden])');
@@ -203,7 +203,7 @@ document.getElementById('flight-delete').addEventListener('click', (event) => {
     }
     document.getElementById('flight_action').value = 'delete_flight';
 });
-['airport', 'aircraft'].forEach((filter) => {
+['airport', 'route', 'aircraft'].forEach((filter) => {
     document.getElementById(`${filter}-filter-open`).addEventListener('click', () => {
         filterPanel.open = true;
         document.getElementById(`${filter}-filter-panel`).scrollIntoView({block: 'nearest', behavior: 'smooth'});
