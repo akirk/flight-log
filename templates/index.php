@@ -15,6 +15,19 @@ $summary = $data['summary'];
 $form = $data['form'];
 $values = $form['values'];
 
+$airports_by_country = [];
+foreach ( $flights as $flight ) {
+    foreach ( [ 'from', 'to' ] as $endpoint ) {
+        $country = $flight[ $endpoint . '_country' ];
+        $airport = $flight[ $endpoint . '_airport' ];
+        $airports_by_country[ $country ][ $airport ] = $summary['airports'][ $airport ];
+    }
+}
+foreach ( $airports_by_country as &$country_airports ) {
+    arsort( $country_airports );
+}
+unset( $country_airports );
+
 $json_flights = array_map(
     static function( array $flight ): array {
         unset( $flight['date_obj'] );
@@ -151,31 +164,69 @@ $render_count_list = static function( string $title, array $counts, string $filt
         <summary>Filters</summary>
         <section class="summary-grid">
             <?php $render_count_list( 'Airlines', $summary['airlines'], 'airline' ); ?>
-            <?php $render_count_list( 'Airports', $summary['airports'], 'airport', 'airport-filter-panel' ); ?>
+            <section class="panel grouping-panel" id="airport-filter-panel" data-grouping-filter>
+                <div class="grouping-filter-header">
+                    <h2>Airports</h2>
+                    <div class="grouping-modes" role="group" aria-label="Group airports by">
+                        <button type="button" data-grouping-mode="airport" aria-pressed="true" aria-controls="airport-mode-airport">Airport</button>
+                        <button type="button" data-grouping-mode="country" aria-pressed="false" aria-controls="airport-mode-country">Country</button>
+                    </div>
+                    <?php foreach ( [ 'airport' => 'airports', 'country' => 'countries' ] as $mode => $group ) : ?>
+                        <?php if ( count( $summary[ $group ] ) > 12 ) : ?>
+                            <button type="button" class="count-list-toggle grouping-list-toggle" data-grouping-expand="<?php echo esc_attr( $mode ); ?>" aria-expanded="false" aria-controls="count-list-<?php echo esc_attr( $mode ); ?>"<?php echo 'airport' !== $mode ? ' hidden' : ''; ?>>
+                                <span class="count-list-hint">Show all (<?php echo esc_html( (string) count( $summary[ $group ] ) ); ?>)</span>
+                            </button>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
+                </div>
+                <div id="airport-mode-airport" data-grouping-view="airport">
+                    <?php $render_count_list( 'Airports', $summary['airports'], 'airport', '', false ); ?>
+                </div>
+                <div id="airport-mode-country" data-grouping-view="country" hidden>
+                    <div class="count-list country-groups" id="count-list-country">
+                        <?php foreach ( $summary['countries'] as $country => $count ) : ?>
+                            <div class="country-group">
+                                <button type="button" class="count-row country-filter" data-filter-label="Countries" data-filter-key="country" data-filter-value="<?php echo esc_attr( $country ); ?>">
+                                    <span><?php echo esc_html( $country ); ?></span>
+                                    <strong><?php echo esc_html( (string) $count ); ?></strong>
+                                </button>
+                                <div class="country-airports">
+                                    <?php foreach ( $airports_by_country[ $country ] as $airport => $airport_count ) : ?>
+                                        <button type="button" class="count-row" data-filter-label="Airports" data-filter-key="airport" data-filter-value="<?php echo esc_attr( $airport ); ?>">
+                                            <span><?php echo esc_html( $airport ); ?></span>
+                                            <strong><?php echo esc_html( (string) $airport_count ); ?></strong>
+                                        </button>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            </section>
             <?php $render_count_list( 'Routes', $summary['routes'], 'route_key' ); ?>
-            <section class="panel aircraft-panel" id="aircraft-filter-panel">
-                <div class="aircraft-filter-header">
+            <section class="panel grouping-panel" id="aircraft-filter-panel" data-grouping-filter>
+                <div class="grouping-filter-header">
                     <h2>Aircraft</h2>
-                    <div class="aircraft-modes" role="group" aria-label="Group aircraft by">
-                        <button type="button" data-aircraft-mode="manufacturer" aria-pressed="false" aria-controls="aircraft-mode-manufacturer" aria-label="Manufacturer">Make</button>
-                        <button type="button" data-aircraft-mode="family" aria-pressed="false" aria-controls="aircraft-mode-family">Family</button>
-                        <button type="button" data-aircraft-mode="type" aria-pressed="true" aria-controls="aircraft-mode-type">Type</button>
+                    <div class="grouping-modes" role="group" aria-label="Group aircraft by">
+                        <button type="button" data-grouping-mode="manufacturer" aria-pressed="false" aria-controls="aircraft-mode-manufacturer" aria-label="Manufacturer">Make</button>
+                        <button type="button" data-grouping-mode="family" aria-pressed="false" aria-controls="aircraft-mode-family">Family</button>
+                        <button type="button" data-grouping-mode="type" aria-pressed="true" aria-controls="aircraft-mode-type">Type</button>
                     </div>
                     <?php foreach ( [ 'manufacturer' => [ 'manufacturers', 'manufacturer' ], 'family' => [ 'families', 'aircraft_family' ], 'type' => [ 'types', 'aircraft_type' ] ] as $mode => $group ) : ?>
                         <?php if ( count( $summary[ $group[0] ] ) > 12 ) : ?>
-                            <button type="button" class="count-list-toggle aircraft-list-toggle" data-aircraft-expand="<?php echo esc_attr( $mode ); ?>" aria-expanded="false" aria-controls="count-list-<?php echo esc_attr( $group[1] ); ?>"<?php echo 'type' !== $mode ? ' hidden' : ''; ?>>
+                            <button type="button" class="count-list-toggle grouping-list-toggle" data-grouping-expand="<?php echo esc_attr( $mode ); ?>" aria-expanded="false" aria-controls="count-list-<?php echo esc_attr( $group[1] ); ?>"<?php echo 'type' !== $mode ? ' hidden' : ''; ?>>
                                 <span class="count-list-hint">Show all (<?php echo esc_html( (string) count( $summary[ $group[0] ] ) ); ?>)</span>
                             </button>
                         <?php endif; ?>
                     <?php endforeach; ?>
                 </div>
-                <div id="aircraft-mode-manufacturer" data-aircraft-view="manufacturer" hidden>
+                <div id="aircraft-mode-manufacturer" data-grouping-view="manufacturer" hidden>
                     <?php $render_count_list( 'Manufacturers', $summary['manufacturers'], 'manufacturer', '', false ); ?>
                 </div>
-                <div id="aircraft-mode-family" data-aircraft-view="family" hidden>
+                <div id="aircraft-mode-family" data-grouping-view="family" hidden>
                     <?php $render_count_list( 'Aircraft families', $summary['families'], 'aircraft_family', '', false ); ?>
                 </div>
-                <div id="aircraft-mode-type" data-aircraft-view="type">
+                <div id="aircraft-mode-type" data-grouping-view="type">
                     <?php $render_count_list( 'Aircraft types', $summary['types'], 'aircraft_type', '', false ); ?>
                 </div>
             </section>
