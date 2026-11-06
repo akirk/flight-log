@@ -562,6 +562,13 @@ class App extends BaseApp {
         return [
             'type'       => 'object',
             'properties' => [
+                'provider_links' => [
+                    'type' => 'object',
+                    'properties' => array_fill_keys( [ 'flightnr', 'regnr' ], [
+                        'type' => 'object',
+                        'properties' => [ 'url' => [ 'type' => 'string' ], 'provider' => [ 'type' => 'string' ] ],
+                    ] ),
+                ],
                 'id'            => [ 'type' => 'integer', 'description' => 'Use with flight-log/save-flight or flight-log/delete-flight.' ],
                 'key'           => [ 'type' => 'string' ],
                 'date'          => [ 'type' => 'string' ],
@@ -909,6 +916,7 @@ class App extends BaseApp {
         $route = $values['route'] ?: $values['from'] . '-' . $values['to'];
 
         return array_merge( $values, [
+            'provider_links' => Providers::links( $values ),
             'id'             => $post_id,
             'key'            => $this->flight_key( $values['flightnr'], $values['date'] ),
             'date_display'   => $date->format( 'Y-m-d H:i' ),
