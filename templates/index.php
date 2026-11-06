@@ -18,7 +18,24 @@ $values = $form['values'];
 $airports_by_country = [];
 $filter_titles = [];
 $seat_letters = [];
+$aircraft_body_labels = [];
+$body_layout_descriptions = [];
+foreach ( \FlightLog\ReferenceOverrides::BODY_TYPES as $body_type ) {
+    $body_layout_descriptions[ $body_type ] = $app->automatic_seat_description( $body_type );
+}
+$body_layout_descriptions['Widebody'] = implode( "\n", array_filter(
+    \FlightLog\ReferenceOverrides::SEAT_LAYOUTS,
+    static function( string $layout ): bool { return 2 === substr_count( $layout, '|' ); },
+    ARRAY_FILTER_USE_KEY
+) );
 foreach ( $flights as $flight ) {
+    foreach ( [ 'aircraft_type', 'aircraft_family' ] as $group ) {
+        $layout = $flight['seat_layout'];
+        $description = isset( \FlightLog\ReferenceOverrides::SEAT_LAYOUTS[ $layout ] )
+            ? 'Configured layout: ' . \FlightLog\ReferenceOverrides::SEAT_LAYOUTS[ $layout ]
+            : "Possible layouts:\n" . $body_layout_descriptions[ $flight['body_type'] ];
+        $aircraft_body_labels[ $group ][ $flight[ $group ] ][ $flight['body_type'] ][ $description ] = true;
+    }
     foreach ( [ 'from', 'to' ] as $endpoint ) {
         $country = $flight[ $endpoint . '_country' ];
         $airport = $flight[ $endpoint . '_airport' ];
@@ -59,7 +76,7 @@ $json_flights = array_map(
     $flights
 );
 
-$render_count_list = static function( string $title, array $counts, string $filter_key, string $id = '', bool $show_heading = true, array $display_names = [] ) use ( $filter_titles ): void {
+$render_count_list = static function( string $title, array $counts, string $filter_key, string $id = '', bool $show_heading = true, array $display_names = [] ) use ( $filter_titles, $aircraft_body_labels ): void {
     ?>
     <section class="panel summary-panel"<?php echo $id ? ' id="' . esc_attr( $id ) . '"' : ''; ?>>
         <?php if ( $show_heading ) : ?>
@@ -77,7 +94,15 @@ $render_count_list = static function( string $title, array $counts, string $filt
         <div class="count-list" id="count-list-<?php echo esc_attr( $filter_key ); ?>">
             <?php foreach ( $counts as $name => $count ) : ?>
                 <button type="button" class="count-row" data-filter-label="<?php echo esc_attr( $title ); ?>" data-filter-key="<?php echo esc_attr( $filter_key ); ?>" data-filter-value="<?php echo esc_attr( $name ); ?>"<?php if ( isset( $filter_titles[ $filter_key ][ $name ] ) ) : ?> title="<?php echo esc_attr( $filter_titles[ $filter_key ][ $name ] ); ?>"<?php endif; ?>>
-                    <span><?php echo esc_html( $display_names[ $name ] ?? $name ); ?></span>
+                    <span><?php echo esc_html( $display_names[ $name ] ?? $name ); ?><?php if ( isset( $aircraft_body_labels[ $filter_key ][ $name ] ) ) : ?>
+                        <?php
+                        $layout_descriptions = [];
+                        foreach ( $aircraft_body_labels[ $filter_key ][ $name ] as $body_type => $descriptions ) {
+                            $layout_descriptions[] = $body_type . ":\n" . implode( "\n", array_keys( $descriptions ) );
+                        }
+                        ?>
+                        <small class="aircraft-body-label" title="<?php echo esc_attr( implode( "\n\n", $layout_descriptions ) ); ?>"><?php echo esc_html( implode( ' / ', array_keys( $aircraft_body_labels[ $filter_key ][ $name ] ) ) ); ?></small>
+                    <?php endif; ?></span>
                     <strong><?php echo esc_html( (string) $count ); ?></strong>
                 </button>
             <?php endforeach; ?>

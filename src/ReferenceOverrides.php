@@ -13,6 +13,7 @@ class ReferenceOverrides {
         'AC|DEFG|HK' => '2–4–2: AC | DEFG | HK',
         'ABC|DEF|HJK' => '3–3–3: ABC | DEF | HJK',
         'ABC|DEFG|HJK' => '3–4–3: ABC | DEFG | HJK',
+        'ABC|DEFG|JKL' => '3–4–3: ABC | DEFG | JKL',
     ];
 
     private const META_KEY = '_flight_log_reference_overrides';

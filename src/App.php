@@ -942,7 +942,8 @@ class App extends BaseApp {
         $manufacturer = $aircraft_parts[0] ?? 'Unknown';
         $aircraft_type = $this->aircraft_type( $values['aircraft'] );
         $body_type = $this->body_type( $aircraft_type, $values['aircraft'] );
-        $seat = $this->seat_info( $values['seat'], $body_type, $this->seat_layout( $aircraft_type, $values['aircraft'] ) );
+        $seat_layout = $this->seat_layout( $aircraft_type, $values['aircraft'] );
+        $seat = $this->seat_info( $values['seat'], $body_type, $seat_layout );
         $airline = $this->airline_name( $values['flightnr'] );
         $from_airport = $this->airport_name( $values['from'] );
         $to_airport = $this->airport_name( $values['to'] );
@@ -967,6 +968,7 @@ class App extends BaseApp {
             'aircraft_type'  => $aircraft_type,
             'aircraft_family' => $this->aircraft_family( $aircraft_type ),
             'body_type'      => $body_type,
+            'seat_layout'    => $seat_layout,
             'seat_position'  => $seat['position'],
             'seat_side'      => $seat['side'],
             'age'            => $this->aircraft_age( $values['first_flight'], $date ),
@@ -1187,6 +1189,12 @@ class App extends BaseApp {
             return 'Unknown';
         }
 
+        if ( preg_match( '/^Embraer\s+(?:ERJ[- ]?|EMB[- ]?|E[- ]?)(135|140|145|170|175|190|195)(?:(?:-?E2)|(?:LR|AR|STD))?/i', $aircraft, $matches ) ) {
+            $model = $matches[1];
+            $generation = preg_match( '/-?E2\b/i', $aircraft ) ? '-E2' : '';
+            return 'Embraer ' . ( (int) $model < 170 ? 'ERJ ' : 'E' ) . $model . $generation;
+        }
+
         $parts = preg_split( '/\s+/', $aircraft );
         $manufacturer = ucfirst( strtolower( $parts[0] ?? '' ) );
         $model = $parts[1] ?? '';
@@ -1207,6 +1215,12 @@ class App extends BaseApp {
     }
 
     private function aircraft_family( string $type ): string {
+        if ( preg_match( '/^Embraer E(170|175|190|195)(-E2)?$/', $type, $matches ) ) {
+            return 'Embraer E-Jet' . ( empty( $matches[2] ) ? '' : ' E2' );
+        }
+        if ( preg_match( '/^Embraer ERJ (135|140|145)$/', $type ) ) {
+            return 'Embraer ERJ';
+        }
         // Group variants of the same model, keeping A319/A320/A321 distinct.
         if ( preg_match( '/^(Airbus A[0-9]{3}|Boeing [0-9]{3})(?:-|\s|$)/i', $type, $matches ) ) {
             return $matches[1];
@@ -1236,7 +1250,7 @@ class App extends BaseApp {
         if ( preg_match( '/\b(DASH|DH8|DHC|ATR|SAAB|BN-2|ISLANDER|BEECH|TWIN OTTER|CESSNA|PIPER|FOKKER\s*50|F50)\b/', $value ) ) {
             return 'Propeller';
         }
-        if ( preg_match( '/\b(E170|E175|E190|E195|EMB-145|CRJ|CANADAIR|FOKKER)\b/', $value ) ) {
+        if ( preg_match( '/\b(E170|E175|E190|E195|ERJ[ -]?(?:135|140|145)|EMB-145|CRJ|CANADAIR|FOKKER)\b/', $value ) ) {
             return 'Regional jet';
         }
         if ( preg_match( '/\b(A220|A318|A319|A320|A321|B707|707|B717|717|B727|727|B737|737|B757|757|DC-9|MD-8|MD-9)\b/', $value ) ) {
