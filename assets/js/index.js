@@ -181,7 +181,8 @@ document.querySelectorAll('[data-grouping-mode]').forEach((button) => {
 });
 
 document.querySelectorAll('[data-filter-key]').forEach((button) => {
-    button.addEventListener('click', () => {
+    button.addEventListener('click', (event) => {
+        event.preventDefault();
         applyFilter(button.dataset.filterKey, button.dataset.filterValue, button.dataset.filterLabel);
     });
 });

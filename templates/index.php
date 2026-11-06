@@ -185,11 +185,13 @@ $render_count_list = static function( string $title, array $counts, string $filt
                 <div id="airport-mode-country" data-grouping-view="country" hidden>
                     <div class="count-list country-groups" id="count-list-country">
                         <?php foreach ( $summary['countries'] as $country => $count ) : ?>
-                            <div class="country-group">
-                                <button type="button" class="count-row country-filter" data-filter-label="Countries" data-filter-key="country" data-filter-value="<?php echo esc_attr( $country ); ?>">
+                            <details class="country-group" open>
+                                <summary class="country-heading">
                                     <span><?php echo esc_html( $country ); ?></span>
-                                    <strong><?php echo esc_html( (string) $count ); ?></strong>
-                                </button>
+                                    <button type="button" class="country-filter" data-filter-label="Countries" data-filter-key="country" data-filter-value="<?php echo esc_attr( $country ); ?>" aria-label="<?php echo esc_attr( 'Filter flights by country ' . $country ); ?>" title="Filter flights by country">
+                                        <?php echo esc_html( (string) $count ); ?>
+                                    </button>
+                                </summary>
                                 <div class="country-airports">
                                     <?php foreach ( $airports_by_country[ $country ] as $airport => $airport_count ) : ?>
                                         <button type="button" class="count-row" data-filter-label="Airports" data-filter-key="airport" data-filter-value="<?php echo esc_attr( $airport ); ?>">
@@ -198,7 +200,7 @@ $render_count_list = static function( string $title, array $counts, string $filt
                                         </button>
                                     <?php endforeach; ?>
                                 </div>
-                            </div>
+                            </details>
                         <?php endforeach; ?>
                     </div>
                 </div>

@@ -1333,8 +1333,14 @@ class App extends BaseApp {
 
     private function reference_names(): array {
         $cache = get_option( self::REFERENCE_NAMES_OPTION, [] );
+        // Discard airport lookups made with the old local-code matching rules.
+        if ( 2 !== ( $cache['airport_lookup_version'] ?? 0 ) ) {
+            $cache['airports'] = [];
+            $cache['airport_countries'] = [];
+        }
 
         return [
+            'airport_lookup_version' => 2,
             'airport_countries' => isset( $cache['airport_countries'] ) && is_array( $cache['airport_countries'] ) ? $cache['airport_countries'] : [],
             'airports' => isset( $cache['airports'] ) && is_array( $cache['airports'] ) ? $cache['airports'] : [],
             'airlines' => isset( $cache['airlines'] ) && is_array( $cache['airlines'] ) ? $cache['airlines'] : [],
@@ -1377,6 +1383,7 @@ class App extends BaseApp {
         $names = [];
         $wanted = array_flip( $codes );
         $countries = array_fill_keys( $codes, '' );
+        $priorities = [];
 
         foreach ( $lines as $line ) {
             if ( '' === trim( $line ) ) {
@@ -1384,10 +1391,12 @@ class App extends BaseApp {
             }
 
             $row = str_getcsv( $line );
-            foreach ( [ 'iata_code', 'icao_code', 'ident', 'gps_code', 'local_code' ] as $column ) {
+            // IATA wins across all rows; only explicit ICAO codes are fallbacks.
+            foreach ( [ 'iata_code' => 2, 'icao_code' => 1 ] as $column => $priority ) {
                 $code = strtoupper( trim( (string) ( $row[ $columns[ $column ] ?? -1 ] ?? '' ) ) );
-                if ( '' !== $code && isset( $wanted[ $code ] ) && ! isset( $names[ $code ] ) ) {
+                if ( '' !== $code && isset( $wanted[ $code ] ) && $priority > ( $priorities[ $code ] ?? 0 ) ) {
                     $name = (string) ( $row[ $columns['name'] ?? -1 ] ?? '' );
+                    $priorities[ $code ] = $priority;
                     $names[ $code ] = trim( $code . ' - ' . $name );
                     $countries[ $code ] = (string) ( $row[ $columns['iso_country'] ?? -1 ] ?? '' );
                 }
