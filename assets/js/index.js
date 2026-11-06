@@ -6,6 +6,50 @@ const activeFilterLabel = document.getElementById('active-filter');
 const form = document.getElementById('flight-form');
 const toggle = document.getElementById('add-flight-toggle');
 const filterPanel = document.getElementById('filter-panel');
+const workspace = document.getElementById('flight-workspace');
+const filterSidebar = document.getElementById('filter-sidebar');
+const activePanelHost = document.getElementById('active-filter-panel');
+const filterCards = Array.from(filterPanel.querySelector('.summary-grid').children);
+const filterHomes = new Map(filterCards.map((card) => {
+    const home = document.createComment('Filter panel position');
+    card.before(home);
+    return [card, home];
+}));
+
+function restoreFilterPanel() {
+    const card = activePanelHost.firstElementChild;
+    if (card) filterHomes.get(card).after(card);
+    filterSidebar.hidden = true;
+    workspace.classList.remove('is-filtering');
+}
+
+function showFilterPanel(key) {
+    const card = filterCards.find((panel) => panel.querySelector(`[data-filter-key="${key}"]`));
+    if (!card) return;
+    const changed = activePanelHost.firstElementChild !== card || filterPanel.open;
+    restoreFilterPanel();
+    activePanelHost.append(card);
+    filterSidebar.hidden = false;
+    workspace.classList.add('is-filtering');
+    filterPanel.open = false;
+    // Select the matching grouping view when filtering from a flight row.
+    const mode = {airport: 'airport', country: 'country', manufacturer: 'manufacturer', aircraft_family: 'family', aircraft_type: 'type'}[key];
+    if (mode) {
+        const modeButton = card.querySelector(`[data-grouping-mode="${mode}"]`);
+        const visibleView = card.querySelector('[data-grouping-view]:not([hidden])');
+        if (modeButton && (!visibleView || !visibleView.querySelector(`[data-filter-key="${key}"][data-filter-value="${CSS.escape(activeFilter.value)}"]`))) modeButton.click();
+    }
+    if (changed) workspace.scrollIntoView({block: 'start', behavior: 'smooth'});
+}
+
+document.getElementById('browse-filters').addEventListener('click', () => {
+    restoreFilterPanel();
+    filterPanel.open = true;
+    filterPanel.scrollIntoView({block: 'start', behavior: 'smooth'});
+});
+filterPanel.addEventListener('toggle', () => {
+    if (filterPanel.open) restoreFilterPanel();
+});
 const fields = ['date', 'flightnr', 'from', 'to', 'route', 'regnr', 'aircraft', 'seat', 'first_flight', 'msn', 'remarks'];
 
 function text(value) {
@@ -77,12 +121,14 @@ function matches(flight) {
 
 function applyFilter(key, value, label) {
     activeFilter = {key, value, label};
+    showFilterPanel(key);
     renderRows();
 }
 
 function renderRows() {
     rows.replaceChildren();
-    flights.filter(matches).forEach((flight) => {
+    const matchingFlights = flights.filter(matches);
+    matchingFlights.forEach((flight) => {
         const tr = document.createElement('tr');
         if (flight.is_future) tr.className = 'is-future';
         [
@@ -135,6 +181,10 @@ function renderRows() {
         rows.append(tr);
     });
     activeFilterLabel.textContent = activeFilter ? `${activeFilter.label}: ${activeFilter.value}` : '';
+    document.getElementById('filter-results-status').textContent = `${matchingFlights.length} ${matchingFlights.length === 1 ? 'flight' : 'flights'}${activeFilter ? ` · ${activeFilter.label}: ${activeFilter.value}` : ''}${search.value.trim() ? ` · Search: ${search.value.trim()}` : ''}`;
+    document.querySelectorAll('[data-filter-key]').forEach((button) => {
+        button.setAttribute('aria-pressed', String(Boolean(activeFilter && button.dataset.filterKey === activeFilter.key && button.dataset.filterValue === activeFilter.value)));
+    });
 }
 
 toggle.addEventListener('click', () => {
@@ -199,6 +249,7 @@ document.querySelectorAll('.count-list-toggle').forEach((button) => {
 });
 document.getElementById('clear-filter').addEventListener('click', () => {
     activeFilter = null;
+    restoreFilterPanel();
     search.value = '';
     renderRows();
 });

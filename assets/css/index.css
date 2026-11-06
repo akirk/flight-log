@@ -137,3 +137,15 @@ tbody tr.is-future td { color: #98a2b3; }
 .reference-table .button { white-space: nowrap; }
 .settings-form { margin-bottom: 24px; }
 .settings-form > .button { margin-top: 12px; }
+.flight-workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; scroll-margin-top: 16px; }
+.flight-workspace.is-filtering { grid-template-columns: 310px minmax(0, 1fr); }
+.flight-results { min-width: 0; }
+.filter-results-status { margin: 0 0 10px; color: var(--muted); font-weight: 700; }
+.filter-sidebar { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow: auto; }
+.filter-sidebar > .button { margin-bottom: 10px; }
+.filter-sidebar .grouping-filter-header { flex-wrap: wrap; }
+.count-row[aria-pressed="true"], .country-filter[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); box-shadow: inset 3px 0 var(--accent); font-weight: 800; }
+@media (max-width: 900px) {
+    .flight-workspace.is-filtering { grid-template-columns: minmax(0, 1fr); }
+    .filter-sidebar { position: static; max-height: 35vh; }
+}
