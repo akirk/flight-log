@@ -27,14 +27,14 @@ class Providers {
     }
 
     public static function handle_submission(): void {
-        if ( 'POST' !== ( $_SERVER['REQUEST_METHOD'] ?? '' ) ) {
+        if ( ! isset( $_POST['providers'] ) || ! is_array( $_POST['providers'] ) ) {
             return;
         }
         if ( ! is_user_logged_in() ) {
             wp_die( esc_html__( 'Please log in to save settings.', 'flight-log' ), '', [ 'response' => 403 ] );
         }
         check_admin_referer( 'flight_log_save_providers' );
-        $values = isset( $_POST['providers'] ) && is_array( $_POST['providers'] ) ? wp_unslash( $_POST['providers'] ) : [];
+        $values = map_deep( wp_unslash( $_POST['providers'] ), 'sanitize_text_field' );
         $settings = self::validate( $values );
         $result = update_user_meta( get_current_user_id(), self::META_KEY, $settings );
         if ( false === $result && self::settings() !== $settings ) {
