@@ -3,8 +3,55 @@ namespace FlightLog;
 
 class ReferenceOverrides {
     public const BODY_TYPES = [ 'Narrowbody', 'Widebody', 'Regional jet', 'Propeller', 'Unknown' ];
+    public const SEAT_LAYOUTS = [
+        'AB|CD' => '2–2: AB | CD',
+        'AC|DF' => '2–2: AC | DF',
+        'AB|EF' => '2–2: AB | EF',
+        'A|CD' => '1–2: A | CD',
+        'AB|DEF' => '2–3: AB | DEF',
+        'ABC|DEF' => '3–3: ABC | DEF',
+        'AC|DEFG|HK' => '2–4–2: AC | DEFG | HK',
+        'ABC|DEF|HJK' => '3–3–3: ABC | DEF | HJK',
+        'ABC|DEFG|HJK' => '3–4–3: ABC | DEFG | HJK',
+    ];
 
     private const META_KEY = '_flight_log_reference_overrides';
+
+    public static function seat_map_url( string $airline, string $aircraft ): string {
+        $name = strtoupper( trim( $aircraft ) );
+        $code = '';
+        if ( preg_match( '/\bA(318|319|320|321)\b/', $name, $match ) ) {
+            $code = $match[1];
+            if ( preg_match( '/NEO|\dN(?:X)?\b/', $name ) ) {
+                $code = '32' . [ '319' => '9', '320' => 'N', '321' => 'Q' ][ $match[1] ];
+            }
+        } elseif ( preg_match( '/\bA(330|340|350|380)-(\d)/', $name, $match ) ) {
+            $code = substr( $match[1], 0, 2 ) . $match[2];
+        } elseif ( preg_match( '/\b(737|747|757|767|777|787)-(\d)/', $name, $match ) ) {
+            $code = substr( $match[1], 0, 2 ) . $match[2];
+            if ( '777' === $match[1] && '3' === $match[2] && false !== strpos( $name, 'ER' ) ) {
+                $code = '77W';
+            } elseif ( '777' === $match[1] && '2' === $match[2] && false !== strpos( $name, 'LR' ) ) {
+                $code = '77L';
+            }
+        } elseif ( preg_match( '/\b737 MAX\s*(\d)/', $name, $match ) ) {
+            $code = '7M' . $match[1];
+        } elseif ( preg_match( '/\b(?:ERJ[- ]?|EMB[- ]?|E)(145|170|175|190|195)/', $name, $match ) ) {
+            $code = [ '145' => 'ER4', '170' => 'E70', '175' => 'E75', '190' => 'E90', '195' => 'E95' ][ $match[1] ];
+        } elseif ( preg_match( '/\bCRJ-(\d)/', $name, $match ) ) {
+            $code = 'CR' . ( '1' === $match[1] || '2' === $match[1] ? '2' : $match[1] );
+        } elseif ( preg_match( '/\bDASH 8-(\d)/', $name, $match ) ) {
+            $code = 'DH' . $match[1];
+        } elseif ( preg_match( '/\bATR\s*(42|72)/', $name, $match ) ) {
+            $code = 'AT' . ( '42' === $match[1] ? '4' : '7' );
+        } elseif ( preg_match( '/\bFOKKER\s*(70|100)/', $name, $match ) ) {
+            $code = '70' === $match[1] ? 'F70' : '100';
+        }
+        if ( '' === $code ) {
+            return 'https://www.google.com/search?q=' . rawurlencode( 'site:aerolopa.com ' . $airline . ' ' . $aircraft . ' seat map' );
+        }
+        return 'https://www.aerolopa.com/' . strtolower( $airline . '-' . $code );
+    }
 
     public static function settings(): array {
         $saved = get_user_meta( get_current_user_id(), self::META_KEY, true );
@@ -57,7 +104,7 @@ class ReferenceOverrides {
                     throw new \InvalidArgumentException( 'Invalid reference entry.' );
                 }
                 $entry = [];
-                foreach ( [ 'code', 'name', 'country', 'icao', 'body_type' ] as $field ) {
+                foreach ( [ 'code', 'name', 'country', 'icao', 'body_type', 'seat_layout' ] as $field ) {
                     if ( isset( $row[ $field ] ) && ! is_string( $row[ $field ] ) ) {
                         throw new \InvalidArgumentException( 'Invalid reference field.' );
                     }
@@ -65,17 +112,20 @@ class ReferenceOverrides {
                 }
                 if ( 'aircraft' === $type ) {
                     $code = trim( $entry['code'] );
-                    if ( '' === $entry['body_type'] ) {
+                    if ( '' === $entry['body_type'] && '' === $entry['seat_layout'] ) {
                         continue;
                     }
-                    if ( '' === $code || strlen( $code ) > 100 || ! in_array( $entry['body_type'], self::BODY_TYPES, true ) ) {
-                        throw new \InvalidArgumentException( 'Use an aircraft name and a valid body type.' );
+                    if ( '' === $code || strlen( $code ) > 100 || ( '' !== $entry['body_type'] && ! in_array( $entry['body_type'], self::BODY_TYPES, true ) ) || ( '' !== $entry['seat_layout'] && ! isset( self::SEAT_LAYOUTS[ $entry['seat_layout'] ] ) ) ) {
+                        throw new \InvalidArgumentException( 'Use an aircraft name and a valid body type and seat layout.' );
                     }
                     $code = strtoupper( $code );
                     if ( isset( $result[ $type ][ $code ] ) ) {
                         throw new \InvalidArgumentException( 'Each aircraft can only have one override.' );
                     }
                     $result[ $type ][ $code ] = [ 'body_type' => $entry['body_type'], 'code' => trim( $entry['code'] ) ];
+                    if ( '' !== $entry['seat_layout'] ) {
+                        $result[ $type ][ $code ]['seat_layout'] = $entry['seat_layout'];
+                    }
                     continue;
                 }
                 $code = strtoupper( trim( $entry['code'] ) );

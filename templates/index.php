@@ -16,11 +16,34 @@ $form = $data['form'];
 $values = $form['values'];
 
 $airports_by_country = [];
+$filter_titles = [];
+$seat_letters = [];
 foreach ( $flights as $flight ) {
     foreach ( [ 'from', 'to' ] as $endpoint ) {
         $country = $flight[ $endpoint . '_country' ];
         $airport = $flight[ $endpoint . '_airport' ];
         $airports_by_country[ $country ][ $airport ] = $summary['airports'][ $airport ];
+        $filter_titles['airport'][ $airport ] = $country;
+    }
+    if ( preg_match( '/^\d+([A-Z])$/i', trim( $flight['seat'] ), $seat_match ) ) {
+        $seat_body_group = 'Widebody' === $flight['body_type'] ? 'Widebody' : 'Narrowbody/regional';
+        foreach ( [ 'seat_position', 'seat_side' ] as $seat_group ) {
+            $seat_letters[ $seat_group ][ $flight[ $seat_group ] ][ $seat_body_group ][ strtoupper( $seat_match[1] ) ] = true;
+        }
+    }
+}
+foreach ( $seat_letters as $seat_group => $regions ) {
+    foreach ( $regions as $region => $body_groups ) {
+        $title_lines = [];
+        foreach ( [ 'Widebody', 'Narrowbody/regional' ] as $seat_body_group ) {
+            if ( ! isset( $body_groups[ $seat_body_group ] ) ) {
+                continue;
+            }
+            $letters = array_keys( $body_groups[ $seat_body_group ] );
+            sort( $letters );
+            $title_lines[] = $seat_body_group . ': ' . implode( ', ', $letters );
+        }
+        $filter_titles[ $seat_group ][ $region ] = "Seat letters in your flights:\n" . implode( "\n", $title_lines );
     }
 }
 foreach ( $airports_by_country as &$country_airports ) {
@@ -36,7 +59,7 @@ $json_flights = array_map(
     $flights
 );
 
-$render_count_list = static function( string $title, array $counts, string $filter_key, string $id = '', bool $show_heading = true, array $display_names = [] ): void {
+$render_count_list = static function( string $title, array $counts, string $filter_key, string $id = '', bool $show_heading = true, array $display_names = [] ) use ( $filter_titles ): void {
     ?>
     <section class="panel summary-panel"<?php echo $id ? ' id="' . esc_attr( $id ) . '"' : ''; ?>>
         <?php if ( $show_heading ) : ?>
@@ -53,7 +76,7 @@ $render_count_list = static function( string $title, array $counts, string $filt
         <?php endif; ?>
         <div class="count-list" id="count-list-<?php echo esc_attr( $filter_key ); ?>">
             <?php foreach ( $counts as $name => $count ) : ?>
-                <button type="button" class="count-row" data-filter-label="<?php echo esc_attr( $title ); ?>" data-filter-key="<?php echo esc_attr( $filter_key ); ?>" data-filter-value="<?php echo esc_attr( $name ); ?>">
+                <button type="button" class="count-row" data-filter-label="<?php echo esc_attr( $title ); ?>" data-filter-key="<?php echo esc_attr( $filter_key ); ?>" data-filter-value="<?php echo esc_attr( $name ); ?>"<?php if ( isset( $filter_titles[ $filter_key ][ $name ] ) ) : ?> title="<?php echo esc_attr( $filter_titles[ $filter_key ][ $name ] ); ?>"<?php endif; ?>>
                     <span><?php echo esc_html( $display_names[ $name ] ?? $name ); ?></span>
                     <strong><?php echo esc_html( (string) $count ); ?></strong>
                 </button>
@@ -197,7 +220,7 @@ $render_count_list = static function( string $title, array $counts, string $filt
                                 </summary>
                                 <div class="country-airports">
                                     <?php foreach ( $airports_by_country[ $country ] as $airport => $airport_count ) : ?>
-                                        <button type="button" class="count-row" data-filter-label="Airports" data-filter-key="airport" data-filter-value="<?php echo esc_attr( $airport ); ?>">
+                                        <button type="button" class="count-row" data-filter-label="Airports" data-filter-key="airport" data-filter-value="<?php echo esc_attr( $airport ); ?>" title="<?php echo esc_attr( $country ); ?>">
                                             <span><?php echo esc_html( $airport ); ?></span>
                                             <strong><?php echo esc_html( (string) $airport_count ); ?></strong>
                                         </button>
