@@ -10,6 +10,25 @@ const airportFilterOpen = document.getElementById('airport-filter-open');
 const airportFilterPanel = document.getElementById('airport-filter-panel');
 const fields = ['date', 'flightnr', 'from', 'to', 'route', 'regnr', 'aircraft', 'seat', 'first_flight', 'msn', 'remarks'];
 
+function text(value) {
+    return value == null ? '' : String(value);
+}
+
+function appendProviderLink(container, value, providerLink) {
+    if (!value || !providerLink || !providerLink.url) {
+        container.textContent = text(value);
+        return;
+    }
+    const link = document.createElement('a');
+    link.className = 'provider-link';
+    link.href = providerLink.url;
+    link.textContent = text(value);
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.setAttribute('aria-label', `${text(value)} on ${providerLink.provider} (opens in a new tab)`);
+    container.append(link);
+}
+
 function setFormOpen(open) {
     form.classList.toggle('hidden', !open);
     toggle.textContent = open ? 'Close form' : 'Add flight';
@@ -75,7 +94,7 @@ function renderRows() {
         ].forEach(([key, className]) => {
             const td = document.createElement('td');
             td.className = className;
-            appendProviderLinks(td, key, flight[key]);
+            appendProviderLink(td, flight[key], (flight.provider_links || {})[key]);
             tr.append(td);
         });
         const action = document.createElement('td');
