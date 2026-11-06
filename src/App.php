@@ -1208,7 +1208,20 @@ class App extends BaseApp {
         return $type;
     }
 
-    private function body_type( string $type, string $aircraft ): string {
+    public function reference_body_type( string $aircraft ): string {
+        return $this->body_type( $this->aircraft_type( $aircraft ), $aircraft, false );
+    }
+
+    private function body_type( string $type, string $aircraft, bool $apply_overrides = true ): string {
+        if ( $apply_overrides ) {
+            $overrides = ReferenceOverrides::settings()['aircraft'];
+            foreach ( [ $aircraft, $type ] as $name ) {
+                $override = $overrides[ strtoupper( trim( $name ) ) ]['body_type'] ?? '';
+                if ( in_array( $override, ReferenceOverrides::BODY_TYPES, true ) ) {
+                    return $override;
+                }
+            }
+        }
         $value = strtoupper( $type . ' ' . $aircraft );
         if ( preg_match( '/\b(A300|A310|A330|A340|A350|A380|B747|747|B767|767|B777|777|B787|787|DC-10|MD-11|L-1011)\b/', $value ) ) {
             return 'Widebody';

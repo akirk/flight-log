@@ -5,13 +5,20 @@ if ( ! defined( 'ABSPATH' ) ) {
 $flight_log_references = \FlightLog\ReferenceOverrides::handle_submission();
 $flight_log_reference_cache = get_option( 'flight_log_reference_names', [] );
 // Include codes from flights even when no reference lookup has succeeded yet.
-$flight_log_used_codes = [ 'airports' => [], 'airlines' => [] ];
+$flight_log_used_codes = [ 'airports' => [], 'airlines' => [], 'aircraft' => [] ];
 $flight_log_posts = get_posts( [
     'post_type' => \FlightLog\App::POST_TYPE,
     'post_status' => [ 'private', 'publish', 'draft' ],
     'posts_per_page' => -1,
 ] );
 foreach ( $flight_log_posts as $flight_log_post ) {
+    $flight_log_aircraft_name = trim( (string) get_post_meta( $flight_log_post->ID, '_flight_log_aircraft', true ) );
+    $flight_log_aircraft = strtoupper( $flight_log_aircraft_name );
+    if ( $flight_log_aircraft ) {
+        $flight_log_used_codes['aircraft'][] = $flight_log_aircraft;
+        $flight_log_reference_cache['aircraft_names'][ $flight_log_aircraft ] = $flight_log_aircraft_name;
+        $flight_log_reference_cache['aircraft'][ $flight_log_aircraft ] = \FlightLog\App::get_instance()->reference_body_type( $flight_log_aircraft );
+    }
     foreach ( [ 'from', 'to' ] as $flight_log_endpoint ) {
         $flight_log_used_codes['airports'][] = strtoupper( trim( (string) get_post_meta( $flight_log_post->ID, '_flight_log_' . $flight_log_endpoint, true ) ) );
     }
@@ -23,7 +30,7 @@ $flight_log_tables = \FlightLog\ReferenceOverrides::table_rows( $flight_log_refe
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php wp_app_the_title( 'Airports and airlines — Flight Log' ); ?></title>
+    <title><?php wp_app_the_title( 'Airports, airlines and aircraft — Flight Log' ); ?></title>
     <?php
     wp_app_enqueue_style(
         'flight-log-index',
@@ -49,7 +56,7 @@ $flight_log_tables = \FlightLog\ReferenceOverrides::table_rows( $flight_log_refe
     <header class="page-header">
         <div>
             <p class="eyebrow">Flight log</p>
-            <h1>Airports and airlines</h1>
+            <h1>Airports, airlines and aircraft</h1>
         </div>
         <a class="button secondary" href="<?php echo esc_url( home_url( '/flight-log/' ) ); ?>">Back to flights</a>
     </header>
@@ -58,19 +65,19 @@ $flight_log_tables = \FlightLog\ReferenceOverrides::table_rows( $flight_log_refe
         <?php endif; ?>
     <form method="post" class="settings-form" aria-labelledby="reference-settings-title">
         <div class="panel settings-panel">
-        <h2 id="reference-settings-title">Airport and airline overrides</h2>
+        <h2 id="reference-settings-title">Reference overrides</h2>
         <p>Correct names or fill in missing entries for your account. Changes apply to existing and new flights. Reference values appear as hints in empty fields. Leave a field blank to use the reference data; clear all fields for a code to remove its override.</p>
         <?php wp_nonce_field( 'flight_log_save_references' ); ?>
         <?php if ( $flight_log_references['error'] ) : ?>
             <p role="alert"><?php echo esc_html( $flight_log_references['error'] ); ?></p>
         <?php endif; ?>
-        <?php foreach ( [ 'airports' => 'Airports', 'airlines' => 'Airlines' ] as $flight_log_type => $flight_log_label ) :
+        <?php foreach ( [ 'airports' => 'Airports', 'airlines' => 'Airlines', 'aircraft' => 'Aircraft' ] as $flight_log_type => $flight_log_label ) :
             $flight_log_index = 0;
             $flight_log_extra = 'airports' === $flight_log_type ? 'country' : 'icao';
             ?>
             <section class="reference-section" data-reference-section="<?php echo esc_attr( $flight_log_type ); ?>">
                 <h3><?php echo esc_html( $flight_log_label ); ?></h3>
-                <p><?php echo esc_html( 'airports' === $flight_log_type ? 'Use IATA (VIE) or ICAO (LOWW) airport codes. Country uses two letters, for example AT.' : 'Use the two-character airline prefix from the flight number, for example OS. ICAO (AUA) is used for FlightAware links.' ); ?></p>
+                <p><?php echo esc_html( 'aircraft' === $flight_log_type ? 'Use the aircraft name shown in your flights. Body type corrections also update estimated seat positions. Leave the body type blank to use the automatic classification.' : ( 'airports' === $flight_log_type ? 'Use IATA (VIE) or ICAO (LOWW) airport codes. Country uses two letters, for example AT.' : 'Use the two-character airline prefix from the flight number, for example OS. ICAO (AUA) is used for FlightAware links.' ) ); ?></p>
                 <?php foreach ( $flight_log_tables[ $flight_log_type ] as $flight_log_group => $flight_log_rows ) : ?>
                     <?php if ( 'known' === $flight_log_group ) : ?>
                         <details>
@@ -82,18 +89,32 @@ $flight_log_tables = \FlightLog\ReferenceOverrides::table_rows( $flight_log_refe
                     <?php endif; ?>
                     <div class="reference-table-scroll">
                         <table class="reference-table">
-                            <thead><tr><th scope="col">Code</th><th scope="col">Name</th><th scope="col"><?php echo 'country' === $flight_log_extra ? 'Country code' : 'ICAO code'; ?></th><th scope="col">Override</th></tr></thead>
+                            <thead><tr><?php if ( 'aircraft' === $flight_log_type ) : ?><th scope="col">Aircraft</th><th scope="col">Body type</th><?php else : ?><th scope="col">Code</th><th scope="col">Name</th><th scope="col"><?php echo 'country' === $flight_log_extra ? 'Country code' : 'ICAO code'; ?></th><?php endif; ?><th scope="col">Override</th></tr></thead>
                             <tbody class="reference-rows" <?php if ( 'missing' === $flight_log_group ) : ?>data-new-references<?php endif; ?>>
                                 <?php foreach ( $flight_log_rows as $flight_log_row ) : ?>
                                     <tr class="reference-row">
-                                        <?php foreach ( [ 'code' => 'Code', 'name' => 'Name', $flight_log_extra => 'country' === $flight_log_extra ? 'Country code' : 'ICAO code' ] as $flight_log_field => $flight_log_field_label ) :
+                                        <?php foreach ( ( 'aircraft' === $flight_log_type ? [ 'code' => 'Aircraft', 'body_type' => 'Body type' ] : [ 'code' => 'Code', 'name' => 'Name', $flight_log_extra => 'country' === $flight_log_extra ? 'Country code' : 'ICAO code' ] ) as $flight_log_field => $flight_log_field_label ) :
                                             $flight_log_id = 'reference-' . $flight_log_type . '-' . $flight_log_index . '-' . $flight_log_field;
                                             ?>
                                             <td>
-                                                <input aria-label="<?php echo esc_attr( $flight_log_field_label . ' ' . ( $flight_log_row['code'] ?? 'new entry' ) ); ?>" id="<?php echo esc_attr( $flight_log_id ); ?>" name="references[<?php echo esc_attr( $flight_log_type ); ?>][<?php echo esc_attr( $flight_log_index ); ?>][<?php echo esc_attr( $flight_log_field ); ?>]" value="<?php echo esc_attr( $flight_log_row[ $flight_log_field ] ?? '' ); ?>" placeholder="<?php echo esc_attr( $flight_log_row[ 'reference_' . $flight_log_field ] ?? '' ); ?>" <?php if ( 'name' !== $flight_log_field ) : ?>class="reference-code" size="4" maxlength="<?php echo 'code' === $flight_log_field && 'airports' === $flight_log_type ? '4' : ( 'icao' === $flight_log_field ? '3' : '2' ); ?>"<?php endif; ?>>
+                                                <?php if ( 'body_type' === $flight_log_field ) : ?>
+                                                    <select aria-label="Body type" id="<?php echo esc_attr( $flight_log_id ); ?>" name="references[aircraft][<?php echo esc_attr( $flight_log_index ); ?>][body_type]">
+                                                        <option value="">Automatic: <?php echo esc_html( $flight_log_row['reference_body_type'] ?? 'Unknown' ); ?></option>
+                                                        <?php foreach ( \FlightLog\ReferenceOverrides::BODY_TYPES as $flight_log_body_type ) : ?>
+                                                            <option value="<?php echo esc_attr( $flight_log_body_type ); ?>" <?php selected( $flight_log_row['body_type'] ?? '', $flight_log_body_type ); ?>><?php echo esc_html( $flight_log_body_type ); ?></option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                <?php else : ?>
+                                                <input aria-label="<?php echo esc_attr( $flight_log_field_label . ' ' . ( $flight_log_row['code'] ?? 'new entry' ) ); ?>" id="<?php echo esc_attr( $flight_log_id ); ?>" name="references[<?php echo esc_attr( $flight_log_type ); ?>][<?php echo esc_attr( $flight_log_index ); ?>][<?php echo esc_attr( $flight_log_field ); ?>]" value="<?php echo esc_attr( ( 'code' === $flight_log_field ? ( $flight_log_row['display_code'] ?? $flight_log_row['code'] ?? '' ) : ( $flight_log_row[ $flight_log_field ] ?? '' ) ) ); ?>" placeholder="<?php echo esc_attr( $flight_log_row[ 'reference_' . $flight_log_field ] ?? '' ); ?>" <?php if ( 'name' !== $flight_log_field && 'aircraft' !== $flight_log_type ) : ?>class="reference-code" size="4" maxlength="<?php echo 'code' === $flight_log_field && 'airports' === $flight_log_type ? '4' : ( 'icao' === $flight_log_field ? '3' : '2' ); ?>"<?php endif; ?>>
+                                                <?php endif; ?>
                                             </td>
                                         <?php endforeach; ?>
-                                        <td><button type="button" class="button secondary remove-reference">Reset</button></td>
+                                        <td>
+                                            <button type="button" class="button secondary remove-reference">Reset</button>
+                                            <?php if ( ! empty( $flight_log_row['code'] ) && in_array( strtoupper( $flight_log_row['code'] ), $flight_log_used_codes[ $flight_log_type ], true ) ) : ?>
+                                                <a class="reference-flights" href="<?php echo esc_url( add_query_arg( [ 'filter' => [ 'airports' => 'airport', 'airlines' => 'airline_code', 'aircraft' => 'aircraft' ][ $flight_log_type ], 'value' => $flight_log_row['code'] ], home_url( '/flight-log/' ) ) ); ?>">View flights</a>
+                                            <?php endif; ?>
+                                        </td>
                                     </tr>
                                     <?php ++$flight_log_index; ?>
                                 <?php endforeach; ?>
@@ -102,7 +123,7 @@ $flight_log_tables = \FlightLog\ReferenceOverrides::table_rows( $flight_log_refe
                     </div>
                     <?php if ( 'known' === $flight_log_group ) : ?></details><?php endif; ?>
                 <?php endforeach; ?>
-                <button type="button" class="button secondary add-reference">Add <?php echo 'airports' === $flight_log_type ? 'airport' : 'airline'; ?></button>
+                <button type="button" class="button secondary add-reference">Add <?php echo 'airports' === $flight_log_type ? 'airport' : ( 'aircraft' === $flight_log_type ? 'aircraft' : 'airline' ); ?></button>
             </section>
         <?php endforeach; ?>
         </div>

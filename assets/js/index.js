@@ -33,7 +33,7 @@ function showFilterPanel(key) {
     workspace.classList.add('is-filtering');
     filterPanel.open = false;
     // Select the matching grouping view when filtering from a flight row.
-    const mode = {airport: 'airport', country: 'country', route_display: 'route', route_key: 'leg', manufacturer: 'manufacturer', aircraft_family: 'family', aircraft_type: 'type'}[key];
+    const mode = {airport: 'airport', country: 'country', route_display: 'route', route_key: 'leg', manufacturer: 'manufacturer', aircraft_family: 'family', aircraft_type: 'type', body_type: 'body'}[key];
     if (mode) {
         const modeButton = card.querySelector(`[data-grouping-mode="${mode}"]`);
         const visibleView = card.querySelector('[data-grouping-view]:not([hidden])');
@@ -111,6 +111,10 @@ function matches(flight) {
             if (![flight.from_airport, flight.to_airport, flight.from, flight.to].map(text).includes(activeFilter.value)) return false;
         } else if (activeFilter.key === 'country') {
             if (![flight.from_country, flight.to_country].map(text).includes(activeFilter.value)) return false;
+        } else if (activeFilter.key === 'airline_code') {
+            if (text(flight.flightnr).slice(0, 2).toUpperCase() !== activeFilter.value.toUpperCase()) return false;
+        } else if (activeFilter.key === 'aircraft') {
+            if (text(flight.aircraft).trim().toUpperCase() !== activeFilter.value.trim().toUpperCase()) return false;
         } else if (text(flight[activeFilter.key]) !== activeFilter.value) {
             return false;
         }
@@ -145,6 +149,11 @@ function renderRows() {
         ].forEach(([key, className]) => {
             const td = document.createElement('td');
             td.className = className;
+            if (key === 'seat' && flight.seat) {
+                const position = text(flight.seat_position || 'Unknown');
+                const bodyType = text(flight.body_type || 'Unknown').toLowerCase();
+                td.title = `${position} on this ${bodyType === 'unknown' ? 'aircraft (type unknown)' : bodyType}`;
+            }
             if ((key === 'from' || key === 'to') && flight[key]) {
                 const airport = document.createElement('button');
                 airport.type = 'button';
@@ -254,7 +263,14 @@ document.getElementById('clear-filter').addEventListener('click', () => {
     renderRows();
 });
 search.addEventListener('input', renderRows);
-renderRows();
+const initialFilter = new URLSearchParams(window.location.search);
+const initialFilterLabels = {airport: 'Airports', airline_code: 'Airline code', aircraft: 'Aircraft', body_type: 'Body types'};
+const initialFilterKey = initialFilter.get('filter');
+if (Object.hasOwn(initialFilterLabels, initialFilterKey) && initialFilter.has('value')) {
+    applyFilter(initialFilterKey, initialFilter.get('value'), initialFilterLabels[initialFilterKey]);
+} else {
+    renderRows();
+}
 
 (function() {
     const sortFlights = () => {

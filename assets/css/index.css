@@ -136,6 +136,8 @@ tbody tr.is-future td { color: #98a2b3; }
 .reference-table input.reference-code { width: 6ch; min-width: 6ch; box-sizing: content-box; }
 .reference-table td:nth-child(2) { width: 100%; min-width: 180px; }
 .reference-table .button { white-space: nowrap; }
+.reference-table td:last-child { min-width: 110px; white-space: nowrap; }
+.reference-flights { display: block; margin-top: 6px; white-space: nowrap; }
 .settings-form { margin-bottom: 24px; }
 .settings-form > .button { margin-top: 12px; }
 .flight-workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; scroll-margin-top: 16px; }
@@ -150,3 +152,9 @@ tbody tr.is-future td { color: #98a2b3; }
     .flight-workspace.is-filtering { grid-template-columns: minmax(0, 1fr); }
     .filter-sidebar { position: static; max-height: 35vh; }
 }
+
+.seat-filter-note { color: var(--muted); font-size: 0.85rem; margin: 0 0 12px; }
+
+[data-reference-section="aircraft"] .reference-table td:first-child { width: 60%; min-width: 260px; }
+[data-reference-section="aircraft"] .reference-table td:nth-child(2) { width: auto; min-width: 180px; }
+[data-reference-section="aircraft"] input { width: 100%; text-transform: none; }

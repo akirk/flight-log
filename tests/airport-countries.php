@@ -93,3 +93,43 @@ $expect( $tables['airports']['missing'][2]['name'], 'My Vienna' );
 $expect( array_column( $tables['airlines']['known'], 'code' ), [ 'OS' ] );
 $expect( array_column( $tables['airlines']['missing'], 'code' ), [ 'XY', 'ZZ' ] );
 echo "Settings table grouping and uncached flight code checks passed.\n";
+
+$reference_test_overrides = FlightLog\ReferenceOverrides::validate( [
+    'aircraft' => [ [ 'code' => 'Custom aircraft', 'body_type' => 'Regional jet' ] ],
+] );
+$expect( $invoke( 'body_type', 'Custom aircraft', 'custom aircraft' ), 'Regional jet' );
+$expect( $invoke( 'seat_info', '12D', $invoke( 'body_type', 'Custom aircraft', 'Custom aircraft' ) )['position'], 'Window' );
+$expect( $app->reference_body_type( 'Custom aircraft' ), 'Unknown' );
+$tables = FlightLog\ReferenceOverrides::table_rows(
+    [ 'aircraft' => [ 'CUSTOM AIRCRAFT' => 'Unknown', 'AIRBUS A320' => 'Narrowbody' ] ],
+    $reference_test_overrides,
+    []
+);
+$expect( $tables['aircraft']['missing'][0]['body_type'], 'Regional jet' );
+$expect( $tables['aircraft']['known'][0]['reference_body_type'], 'Narrowbody' );
+foreach ( [
+    [ [ 'code' => 'Test', 'body_type' => 'Invalid' ] ],
+    [ [ 'code' => '', 'body_type' => 'Widebody' ] ],
+    [ [ 'code' => 'Test', 'body_type' => 'Widebody' ], [ 'code' => 'test', 'body_type' => 'Propeller' ] ],
+] as $bad ) {
+    try {
+        FlightLog\ReferenceOverrides::validate( [ 'aircraft' => $bad ] );
+        throw new RuntimeException( 'Invalid aircraft override accepted.' );
+    } catch ( InvalidArgumentException $e ) {
+        // Expected invalid or duplicate aircraft entry.
+    }
+}
+$reference_test_overrides = FlightLog\ReferenceOverrides::validate( [ 'aircraft' => [ [ 'code' => 'Custom aircraft', 'body_type' => '' ] ] ] );
+$expect( $reference_test_overrides['aircraft'], [] );
+$expect( $invoke( 'body_type', 'Custom aircraft', 'Custom aircraft' ), 'Unknown' );
+echo "Aircraft body override, seat estimation, validation and removal checks passed.\n";
+
+$aircraft_values = FlightLog\ReferenceOverrides::validate( [ 'aircraft' => [ [ 'code' => 'Embraer ERJ-190LR', 'body_type' => 'Regional jet' ] ] ] );
+$tables = FlightLog\ReferenceOverrides::table_rows(
+    [ 'aircraft' => [ 'EMBRAER ERJ-190LR' => 'Unknown' ], 'aircraft_names' => [ 'EMBRAER ERJ-190LR' => 'Embraer ERJ-190LR' ] ],
+    $aircraft_values,
+    [ 'aircraft' => [ 'EMBRAER ERJ-190LR' ] ]
+);
+$expect( count( $tables['aircraft']['missing'] ), 1 );
+$expect( $tables['aircraft']['missing'][0]['display_code'], 'Embraer ERJ-190LR' );
+echo "Aircraft display casing and override row deduplication checks passed.\n";
