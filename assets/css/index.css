@@ -61,6 +61,10 @@ input:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px
 .filter-panel summary:focus { outline: 0; text-decoration: underline; }
 .summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
 .panel { border: 1px solid var(--border); border-radius: 8px; background: var(--surface); padding: 13px; min-width: 0; }
+.count-list-toggle { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; border: 0; padding: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.count-list-hint { color: var(--accent); font-size: 12px; font-weight: 400; }
+.count-list-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.count-list:not(.is-expanded) > .count-row:nth-child(n + 13) { display: none; }
 .count-list { display: grid; gap: 4px; }
 .count-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; width: 100%; border: 0; border-radius: 5px; background: transparent; color: var(--text); cursor: pointer; padding: 6px 7px; text-align: left; }
 .count-row:hover, .count-row:focus { background: var(--accent-soft); outline: 0; }
@@ -75,6 +79,9 @@ th:last-child, td:last-child { border-right: 0; }
 tbody tr:nth-child(even) td { background: #fbfcfe; }
 tbody tr.is-future td { color: #98a2b3; }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; white-space: nowrap; }
+.airport-filter { border: 0; padding: 0; background: transparent; color: var(--accent); font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.airport-filter:hover { text-decoration-thickness: 2px; }
+.airport-filter:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .provider-link { color: var(--accent); text-underline-offset: 3px; }
 .provider-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .settings-fields { display: flex; flex-wrap: wrap; gap: 16px; }

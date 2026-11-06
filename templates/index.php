@@ -26,10 +26,19 @@ $json_flights = array_map(
 $render_count_list = static function( string $title, array $counts, string $filter_key, string $id = '' ): void {
     ?>
     <section class="panel summary-panel"<?php echo $id ? ' id="' . esc_attr( $id ) . '"' : ''; ?>>
-        <h2><?php echo esc_html( $title ); ?></h2>
-        <div class="count-list">
-            <?php foreach ( array_slice( $counts, 0, 12, true ) as $name => $count ) : ?>
-                <button type="button" class="count-row" data-filter-key="<?php echo esc_attr( $filter_key ); ?>" data-filter-value="<?php echo esc_attr( $name ); ?>">
+        <h2>
+            <?php if ( count( $counts ) > 12 ) : ?>
+                <button type="button" class="count-list-toggle" aria-expanded="false" aria-controls="count-list-<?php echo esc_attr( $filter_key ); ?>">
+                    <?php echo esc_html( $title ); ?>
+                    <span class="count-list-hint" aria-hidden="true">Show all (<?php echo esc_html( (string) count( $counts ) ); ?>)</span>
+                </button>
+            <?php else : ?>
+                <?php echo esc_html( $title ); ?>
+            <?php endif; ?>
+        </h2>
+        <div class="count-list" id="count-list-<?php echo esc_attr( $filter_key ); ?>">
+            <?php foreach ( $counts as $name => $count ) : ?>
+                <button type="button" class="count-row" data-filter-label="<?php echo esc_attr( $title ); ?>" data-filter-key="<?php echo esc_attr( $filter_key ); ?>" data-filter-value="<?php echo esc_attr( $name ); ?>">
                     <span><?php echo esc_html( $name ); ?></span>
                     <strong><?php echo esc_html( (string) $count ); ?></strong>
                 </button>
