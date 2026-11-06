@@ -23,9 +23,10 @@ $json_flights = array_map(
     $flights
 );
 
-$render_count_list = static function( string $title, array $counts, string $filter_key, string $id = '' ): void {
+$render_count_list = static function( string $title, array $counts, string $filter_key, string $id = '', bool $show_heading = true ): void {
     ?>
     <section class="panel summary-panel"<?php echo $id ? ' id="' . esc_attr( $id ) . '"' : ''; ?>>
+        <?php if ( $show_heading ) : ?>
         <h2>
             <?php if ( count( $counts ) > 12 ) : ?>
                 <button type="button" class="count-list-toggle" aria-expanded="false" aria-controls="count-list-<?php echo esc_attr( $filter_key ); ?>">
@@ -36,6 +37,7 @@ $render_count_list = static function( string $title, array $counts, string $filt
                 <?php echo esc_html( $title ); ?>
             <?php endif; ?>
         </h2>
+        <?php endif; ?>
         <div class="count-list" id="count-list-<?php echo esc_attr( $filter_key ); ?>">
             <?php foreach ( $counts as $name => $count ) : ?>
                 <button type="button" class="count-row" data-filter-label="<?php echo esc_attr( $title ); ?>" data-filter-key="<?php echo esc_attr( $filter_key ); ?>" data-filter-value="<?php echo esc_attr( $name ); ?>">
@@ -151,7 +153,32 @@ $render_count_list = static function( string $title, array $counts, string $filt
             <?php $render_count_list( 'Airlines', $summary['airlines'], 'airline' ); ?>
             <?php $render_count_list( 'Airports', $summary['airports'], 'airport', 'airport-filter-panel' ); ?>
             <?php $render_count_list( 'Routes', $summary['routes'], 'route_key' ); ?>
-            <?php $render_count_list( 'Aircraft types', $summary['types'], 'aircraft_type', 'aircraft-filter-panel' ); ?>
+            <section class="panel aircraft-panel" id="aircraft-filter-panel">
+                <div class="aircraft-filter-header">
+                    <h2>Aircraft</h2>
+                    <div class="aircraft-modes" role="group" aria-label="Group aircraft by">
+                        <button type="button" data-aircraft-mode="manufacturer" aria-pressed="false" aria-controls="aircraft-mode-manufacturer" aria-label="Manufacturer">Make</button>
+                        <button type="button" data-aircraft-mode="family" aria-pressed="false" aria-controls="aircraft-mode-family">Family</button>
+                        <button type="button" data-aircraft-mode="type" aria-pressed="true" aria-controls="aircraft-mode-type">Type</button>
+                    </div>
+                    <?php foreach ( [ 'manufacturer' => [ 'manufacturers', 'manufacturer' ], 'family' => [ 'families', 'aircraft_family' ], 'type' => [ 'types', 'aircraft_type' ] ] as $mode => $group ) : ?>
+                        <?php if ( count( $summary[ $group[0] ] ) > 12 ) : ?>
+                            <button type="button" class="count-list-toggle aircraft-list-toggle" data-aircraft-expand="<?php echo esc_attr( $mode ); ?>" aria-expanded="false" aria-controls="count-list-<?php echo esc_attr( $group[1] ); ?>"<?php echo 'type' !== $mode ? ' hidden' : ''; ?>>
+                                <span class="count-list-hint">Show all (<?php echo esc_html( (string) count( $summary[ $group[0] ] ) ); ?>)</span>
+                            </button>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
+                </div>
+                <div id="aircraft-mode-manufacturer" data-aircraft-view="manufacturer" hidden>
+                    <?php $render_count_list( 'Manufacturers', $summary['manufacturers'], 'manufacturer', '', false ); ?>
+                </div>
+                <div id="aircraft-mode-family" data-aircraft-view="family" hidden>
+                    <?php $render_count_list( 'Aircraft families', $summary['families'], 'aircraft_family', '', false ); ?>
+                </div>
+                <div id="aircraft-mode-type" data-aircraft-view="type">
+                    <?php $render_count_list( 'Aircraft types', $summary['types'], 'aircraft_type', '', false ); ?>
+                </div>
+            </section>
             <?php $render_count_list( 'Body types', $summary['body_types'], 'body_type' ); ?>
             <?php $render_count_list( 'Years', $summary['years'], 'year' ); ?>
         </section>

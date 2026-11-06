@@ -820,6 +820,8 @@ class App extends BaseApp {
             'routes'      => [],
             'aircraft'    => [],
             'types'       => [],
+            'manufacturers' => [],
+            'families'      => [],
             'body_types'  => [],
             'years'       => [],
             'seats'       => [],
@@ -837,6 +839,8 @@ class App extends BaseApp {
             $this->count( $summary['routes'], $flight['route_key'] );
             $this->count( $summary['aircraft'], $flight['regnr'] ?: $flight['aircraft'] ?: 'Unknown' );
             $this->count( $summary['types'], $flight['aircraft_type'] );
+            $this->count( $summary['manufacturers'], $flight['manufacturer'] );
+            $this->count( $summary['families'], $flight['aircraft_family'] );
             $this->count( $summary['body_types'], $flight['body_type'] );
             $this->count( $summary['years'], $flight['year'] );
             if ( $flight['seat'] ) {
@@ -930,6 +934,7 @@ class App extends BaseApp {
             'to_airport'     => $to_airport,
             'manufacturer'   => $manufacturer ?: 'Unknown',
             'aircraft_type'  => $aircraft_type,
+            'aircraft_family' => $this->aircraft_family( $aircraft_type ),
             'body_type'      => $body_type,
             'seat_position'  => $seat['position'],
             'seat_side'      => $seat['side'],
@@ -1167,6 +1172,15 @@ class App extends BaseApp {
         }
 
         return trim( $manufacturer . ' ' . $model );
+    }
+
+    private function aircraft_family( string $type ): string {
+        // Group variants of the same model, keeping A319/A320/A321 distinct.
+        if ( preg_match( '/^(Airbus A[0-9]{3}|Boeing [0-9]{3})(?:-|\s|$)/i', $type, $matches ) ) {
+            return $matches[1];
+        }
+
+        return $type;
     }
 
     private function body_type( string $type, string $aircraft ): string {
