@@ -535,6 +535,7 @@ class App extends BaseApp {
                         'aircraft'   => [ 'type' => 'object' ],
                         'types'      => [ 'type' => 'object' ],
                         'body_types' => [ 'type' => 'object' ],
+                        'ages'       => [ 'type' => 'object' ],
                         'years'      => [ 'type' => 'object' ],
                         'seats'      => [ 'type' => 'object' ],
                         'seat_sides' => [ 'type' => 'object' ],
@@ -591,6 +592,7 @@ class App extends BaseApp {
                 'seat_position' => [ 'type' => 'string' ],
                 'seat_side'     => [ 'type' => 'string' ],
                 'age'           => [ 'type' => 'string' ],
+                'age_bucket'    => [ 'type' => 'string' ],
                 'remarks'       => [ 'type' => 'string' ],
                 'is_future'     => [ 'type' => 'boolean' ],
                 'created'       => [ 'type' => 'boolean' ],
@@ -828,6 +830,7 @@ class App extends BaseApp {
             'manufacturers' => [],
             'families'      => [],
             'body_types'  => [],
+            'ages'        => [],
             'years'       => [],
             'seats'       => [],
             'seat_sides'  => [],
@@ -851,6 +854,7 @@ class App extends BaseApp {
             $this->count( $summary['manufacturers'], $flight['manufacturer'] );
             $this->count( $summary['families'], $flight['aircraft_family'] );
             $this->count( $summary['body_types'], $flight['body_type'] );
+            $this->count( $summary['ages'], $flight['age_bucket'] );
             $this->count( $summary['years'], $flight['year'] );
             if ( $flight['seat'] ) {
                 $this->count( $summary['seats'], $flight['seat'] );
@@ -865,6 +869,8 @@ class App extends BaseApp {
                 arsort( $summary[ $key ] );
             }
         }
+
+        $summary['ages'] = array_replace( array_intersect_key( array_fill_keys( [ 'Under 1 year', '1–4 years', '5–9 years', '10–14 years', '15–19 years', '20–24 years', '25–29 years', '30–34 years', '35–39 years', '40+ years', 'Unknown' ], 0 ), $summary['ages'] ), $summary['ages'] );
 
         return [
             'flights' => $flights,
@@ -964,6 +970,7 @@ class App extends BaseApp {
             'seat_position'  => $seat['position'],
             'seat_side'      => $seat['side'],
             'age'            => $this->aircraft_age( $values['first_flight'], $date ),
+            'age_bucket'     => $this->aircraft_age_bucket( $this->aircraft_age( $values['first_flight'], $date ) ),
         ] );
     }
 
@@ -1263,6 +1270,26 @@ class App extends BaseApp {
             'position' => in_array( $letter, [ 'A', 'F' ], true ) ? 'Window' : ( in_array( $letter, [ 'C', 'D' ], true ) ? 'Aisle' : ( in_array( $letter, [ 'B', 'E' ], true ) ? 'Middle' : 'Unknown' ) ),
             'side'     => in_array( $letter, [ 'A', 'B', 'C' ], true ) ? 'Left' : ( in_array( $letter, [ 'D', 'E', 'F' ], true ) ? 'Right' : 'Unknown' ),
         ];
+    }
+
+    private function aircraft_age_bucket( string $age ): string {
+        if ( '' === $age ) {
+            return 'Unknown';
+        }
+
+        $years = preg_match( '/^(\d+)y/', $age, $matches ) ? (int) $matches[1] : 0;
+        if ( $years < 1 ) {
+            return 'Under 1 year';
+        }
+        if ( $years < 5 ) {
+            return '1–4 years';
+        }
+        if ( $years >= 40 ) {
+            return '40+ years';
+        }
+
+        $lower = (int) floor( $years / 5 ) * 5;
+        return $lower . '–' . ( $lower + 4 ) . ' years';
     }
 
     private function aircraft_age( string $first_flight, DateTime $flight_date ): string {

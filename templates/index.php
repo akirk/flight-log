@@ -238,8 +238,9 @@ $render_count_list = static function( string $title, array $counts, string $filt
                         <button type="button" data-grouping-mode="family" aria-pressed="false" aria-controls="aircraft-mode-family">Family</button>
                         <button type="button" data-grouping-mode="type" aria-pressed="true" aria-controls="aircraft-mode-type">Type</button>
                         <button type="button" data-grouping-mode="body" aria-pressed="false" aria-controls="aircraft-mode-body">Body</button>
+                        <button type="button" data-grouping-mode="age" aria-pressed="false" aria-controls="aircraft-mode-age">Age</button>
                     </div>
-                    <?php foreach ( [ 'manufacturer' => [ 'manufacturers', 'manufacturer' ], 'family' => [ 'families', 'aircraft_family' ], 'type' => [ 'types', 'aircraft_type' ], 'body' => [ 'body_types', 'body_type' ] ] as $mode => $group ) : ?>
+                    <?php foreach ( [ 'manufacturer' => [ 'manufacturers', 'manufacturer' ], 'family' => [ 'families', 'aircraft_family' ], 'type' => [ 'types', 'aircraft_type' ], 'body' => [ 'body_types', 'body_type' ], 'age' => [ 'ages', 'age_bucket' ] ] as $mode => $group ) : ?>
                         <?php if ( count( $summary[ $group[0] ] ) > 12 ) : ?>
                             <button type="button" class="count-list-toggle grouping-list-toggle" data-grouping-expand="<?php echo esc_attr( $mode ); ?>" aria-expanded="false" aria-controls="count-list-<?php echo esc_attr( $group[1] ); ?>"<?php echo 'type' !== $mode ? ' hidden' : ''; ?>>
                                 <span class="count-list-hint">Show all (<?php echo esc_html( (string) count( $summary[ $group[0] ] ) ); ?>)</span>
@@ -258,6 +259,9 @@ $render_count_list = static function( string $title, array $counts, string $filt
                 </div>
                 <div id="aircraft-mode-body" data-grouping-view="body" hidden>
                     <?php $render_count_list( 'Body types', $summary['body_types'], 'body_type', '', false ); ?>
+                </div>
+                <div id="aircraft-mode-age" data-grouping-view="age" hidden>
+                    <?php $render_count_list( 'Aircraft age', $summary['ages'], 'age_bucket', '', false ); ?>
                 </div>
             </section>
             <section class="panel grouping-panel" id="seat-filter-panel">
