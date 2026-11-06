@@ -149,7 +149,11 @@ function renderRows() {
         ].forEach(([key, className]) => {
             const td = document.createElement('td');
             td.className = className;
-            if (key === 'seat' && flight.seat) td.title = text(flight.aircraft || flight.aircraft_type || 'Unknown aircraft');
+            if (key === 'seat' && flight.seat) {
+                const position = text(flight.seat_position || 'Unknown');
+                const bodyType = text(flight.body_type || 'Unknown').toLowerCase();
+                td.title = `${position} on ${bodyType === 'unknown' ? 'an unknown aircraft type' : `a ${bodyType}`}`;
+            }
             if ((key === 'from' || key === 'to') && flight[key]) {
                 const airport = document.createElement('button');
                 airport.type = 'button';
