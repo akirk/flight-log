@@ -1,11 +1,15 @@
 <?php
 // Standalone checks: php tests/providers.php.
 require_once __DIR__ . '/../src/Providers.php';
+require_once __DIR__ . '/../src/ReferenceOverrides.php';
 
 $provider_test_settings = [];
 function get_current_user_id() { return 42; }
 function get_user_meta( $id, $key, $single ) {
     global $provider_test_settings;
+    if ( '_flight_log_reference_overrides' === $key ) {
+        return [ 'airlines' => [ 'XY' => [ 'icao' => 'XYZ' ] ] ];
+    }
     if ( 42 !== $id || '_flight_log_link_providers' !== $key || ! $single ) {
         throw new RuntimeException( 'Unexpected preference lookup.' );
     }
@@ -34,6 +38,7 @@ foreach ( [ 'OS00184' => 'AUA184', 'U20012' => 'EZY12', 'AUA0012' => 'AUA12' ] a
     expect_provider( $links['regnr']['url'], 'https://www.flightaware.com/live/flight/OELZQ' );
 }
 expect_provider( Providers::links( [ 'flightnr' => 'ZZ0012' ] )['flightnr']['url'], '' );
+expect_provider( Providers::links( [ 'flightnr' => 'XY0012' ] )['flightnr']['url'], 'https://www.flightaware.com/live/flight/XYZ12' );
 $provider_test_settings = [ 'flightnr' => 'none', 'regnr' => 'none' ];
 expect_provider( Providers::links( [ 'flightnr' => 'OS12', 'regnr' => 'OE-LZQ' ] )['flightnr']['url'], '' );
 $provider_test_settings = [ 'regnr' => 'airfleets' ];

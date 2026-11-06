@@ -125,3 +125,15 @@ tbody tr.is-future td { color: #98a2b3; }
 .country-filter:hover { background: var(--accent-soft); text-decoration: underline; }
 .country-filter:focus-visible, .country-heading:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .country-airports { margin: 2px 0 8px 14px; padding-left: 6px; border-left: 1px solid var(--border); }
+.reference-section { margin: 24px 0; }
+.reference-section details { margin-bottom: 16px; }
+.reference-row { margin-bottom: 16px; align-items: end; }
+.reference-row .button { margin-bottom: 2px; }
+.reference-table-scroll { overflow-x: auto; margin: 12px 0; }
+.reference-table { width: 100%; border-collapse: collapse; }
+.reference-table th, .reference-table td { padding: 8px; text-align: left; }
+.reference-table input.reference-code { width: 6ch; min-width: 6ch; box-sizing: content-box; }
+.reference-table td:nth-child(2) { width: 100%; min-width: 180px; }
+.reference-table .button { white-space: nowrap; }
+.settings-form { margin-bottom: 24px; }
+.settings-form > .button { margin-top: 12px; }

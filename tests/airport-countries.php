@@ -4,6 +4,10 @@ require_once __DIR__ . '/../vendor/autoload.php';
 
 $country_test_cache = [ 'airports' => [ 'FRA' => 'FRA - Wrong airport' ], 'airport_countries' => [ 'FRA' => 'AR' ], 'airlines' => [ 'OS' => 'Austrian Airlines' ] ];
 $country_test_requests = 0;
+$reference_test_overrides = [];
+function get_current_user_id() { return 42; }
+function get_user_meta( $id, $key, $single ) { global $reference_test_overrides; return $reference_test_overrides; }
+function sanitize_text_field( $value ) { return trim( strip_tags( $value ) ); }
 function get_option( $key, $default = false ) {
     global $country_test_cache;
     return $country_test_cache;
@@ -56,3 +60,36 @@ $expect( $country_test_cache['airport_lookup_version'], 2 );
 $invoke( 'prime_reference_names', [ 'VIE', 'LOWW', 'FRA', 'ZZZ' ], [] );
 $expect( $country_test_requests, 1 );
 echo "Airport country cache and lookup checks passed.\n";
+
+$reference_test_overrides = FlightLog\ReferenceOverrides::validate( [
+    'airports' => [ [ 'code' => 'zzz', 'name' => 'Custom airport', 'country' => 'at' ], [ 'code' => 'FRA', 'name' => 'Corrected Frankfurt' ] ],
+    'airlines' => [ [ 'code' => 'ZZ', 'name' => 'Custom airline', 'icao' => 'zzz' ] ],
+] );
+$expect( $invoke( 'airport_name', 'zzz' ), 'ZZZ - Custom airport' );
+$expect( $invoke( 'airport_country', 'ZZZ' ), 'Austria' );
+$expect( $invoke( 'airport_name', 'FRA' ), 'FRA - Corrected Frankfurt' );
+$expect( $invoke( 'airport_country', 'FRA' ), 'Germany' );
+$expect( $invoke( 'airline_name', 'ZZ12' ), 'Custom airline' );
+$expect( $country_test_cache['airports']['ZZZ'], 'ZZZ' );
+$reference_test_overrides = FlightLog\ReferenceOverrides::validate( [ 'airports' => [ [ 'code' => 'ZZZ', 'name' => '' ] ] ] );
+$expect( $invoke( 'airport_name', 'ZZZ' ), 'ZZZ' );
+$expect( $invoke( 'airline_name', 'ZZ12' ), 'ZZ' );
+foreach ( [ [ 'code' => 'BAD!!', 'name' => 'Bad' ], [ 'code' => 'VIE', 'country' => 'AUT' ], [ 'code' => 'VIE', 'name' => [] ] ] as $bad ) {
+    try {
+        FlightLog\ReferenceOverrides::validate( [ 'airports' => [ $bad ] ] );
+        throw new RuntimeException( 'Invalid override accepted.' );
+    } catch ( InvalidArgumentException $expected ) {}
+}
+echo "Reference override validation, lookup, country fallback, removal and cache isolation checks passed.\n";
+
+$tables = FlightLog\ReferenceOverrides::table_rows(
+    [ 'airports' => [ 'VIE' => 'VIE - Vienna', 'ZZZ' => 'ZZZ', 'FRA' => 'FRA - Frankfurt' ], 'airport_countries' => [ 'VIE' => 'AT' ], 'airlines' => [ 'OS' => 'Austrian Airlines', 'ZZ' => 'ZZ' ] ],
+    [ 'airports' => [ 'VIE' => [ 'name' => 'My Vienna' ] ], 'airlines' => [] ],
+    [ 'airports' => [ 'NEW' ], 'airlines' => [ 'XY' ] ]
+);
+$expect( array_column( $tables['airports']['missing'], 'code' ), [ 'FRA', 'NEW', 'VIE', 'ZZZ' ] );
+$expect( $tables['airports']['missing'][2]['reference_name'], 'Vienna' );
+$expect( $tables['airports']['missing'][2]['name'], 'My Vienna' );
+$expect( array_column( $tables['airlines']['known'], 'code' ), [ 'OS' ] );
+$expect( array_column( $tables['airlines']['missing'], 'code' ), [ 'XY', 'ZZ' ] );
+echo "Settings table grouping and uncached flight code checks passed.\n";
