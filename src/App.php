@@ -942,7 +942,7 @@ class App extends BaseApp {
         $manufacturer = $aircraft_parts[0] ?? 'Unknown';
         $aircraft_type = $this->aircraft_type( $values['aircraft'] );
         $body_type = $this->body_type( $aircraft_type, $values['aircraft'] );
-        $seat = $this->seat_info( $values['seat'], $body_type );
+        $seat = $this->seat_info( $values['seat'], $body_type, $this->seat_layout( $aircraft_type, $values['aircraft'] ) );
         $airline = $this->airline_name( $values['flightnr'] );
         $from_airport = $this->airport_name( $values['from'] );
         $to_airport = $this->airport_name( $values['to'] );
@@ -1245,14 +1245,62 @@ class App extends BaseApp {
         return 'Unknown';
     }
 
-    private function seat_info( string $seat, string $body_type ): array {
+    public function automatic_seat_description( string $body_type ): string {
+        $layouts = [];
+        foreach ( ReferenceOverrides::SEAT_LAYOUTS as $layout => $label ) {
+            $compatible = true;
+            foreach ( str_split( str_replace( '|', '', $layout ) ) as $letter ) {
+                if ( $this->seat_info( '1' . $letter, $body_type ) !== $this->seat_info( '1' . $letter, $body_type, $layout ) ) {
+                    $compatible = false;
+                    break;
+                }
+            }
+            if ( $compatible ) {
+                $layouts[] = $label;
+            }
+        }
+        return implode( "\n", $layouts );
+    }
+
+    private function seat_layout( string $type, string $aircraft ): string {
+        $overrides = ReferenceOverrides::settings()['aircraft'];
+        foreach ( [ $aircraft, $type ] as $name ) {
+            $layout = $overrides[ strtoupper( trim( $name ) ) ]['seat_layout'] ?? '';
+            if ( isset( ReferenceOverrides::SEAT_LAYOUTS[ $layout ] ) ) {
+                return $layout;
+            }
+        }
+        return '';
+    }
+
+    private function seat_info( string $seat, string $body_type, string $layout = '' ): array {
         $seat = strtoupper( trim( $seat ) );
         if ( '' === $seat || ! preg_match( '/^(\d+)([A-Z])$/', $seat, $matches ) ) {
             return [ 'position' => 'Unknown', 'side' => 'Unknown' ];
         }
 
         $letter = $matches[2];
+        if ( isset( ReferenceOverrides::SEAT_LAYOUTS[ $layout ] ) ) {
+            $blocks = explode( '|', $layout );
+            foreach ( $blocks as $index => $block ) {
+                $position = strpos( $block, $letter );
+                if ( false === $position ) {
+                    continue;
+                }
+                $last_block = count( $blocks ) - 1;
+                $window = ( 0 === $index && 0 === $position ) || ( $last_block === $index && strlen( $block ) - 1 === $position );
+                $aisle = ( $index > 0 && 0 === $position ) || ( $index < $last_block && strlen( $block ) - 1 === $position );
+                return [
+                    'position' => $window ? 'Window' : ( $aisle ? 'Aisle' : 'Middle' ),
+                    'side' => 0 === $index ? 'Left' : ( $last_block === $index ? 'Right' : 'Center' ),
+                ];
+            }
+            return [ 'position' => 'Unknown', 'side' => 'Unknown' ];
+        }
         if ( 'Widebody' === $body_type ) {
+            if ( ! in_array( $letter, [ 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L' ], true ) ) {
+                return [ 'position' => 'Unknown', 'side' => 'Unknown' ];
+            }
             return [
                 'position' => in_array( $letter, [ 'A', 'K', 'L' ], true ) ? 'Window' : ( in_array( $letter, [ 'C', 'D', 'G', 'H' ], true ) ? 'Aisle' : 'Middle' ),
                 'side'     => in_array( $letter, [ 'A', 'B', 'C' ], true ) ? 'Left' : ( in_array( $letter, [ 'D', 'E', 'F', 'G' ], true ) ? 'Center' : 'Right' ),

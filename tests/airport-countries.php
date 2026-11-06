@@ -133,3 +133,45 @@ $tables = FlightLog\ReferenceOverrides::table_rows(
 $expect( count( $tables['aircraft']['missing'] ), 1 );
 $expect( $tables['aircraft']['missing'][0]['display_code'], 'Embraer ERJ-190LR' );
 echo "Aircraft display casing and override row deduplication checks passed.\n";
+
+$reference_test_overrides = FlightLog\ReferenceOverrides::validate( [
+    'aircraft' => [ [ 'code' => 'Custom aircraft', 'seat_layout' => 'AC|DF' ] ],
+] );
+$expect( $reference_test_overrides['aircraft']['CUSTOM AIRCRAFT']['body_type'], '' );
+$expect( $invoke( 'seat_layout', 'Custom aircraft', 'custom aircraft' ), 'AC|DF' );
+$expect( $invoke( 'body_type', 'Custom aircraft', 'Custom aircraft' ), 'Unknown' );
+$expect( $invoke( 'seat_info', '6F', 'Regional jet', 'AC|DF' ), [ 'position' => 'Window', 'side' => 'Right' ] );
+$expect( $invoke( 'seat_info', '6D', 'Regional jet', 'AC|DF' ), [ 'position' => 'Aisle', 'side' => 'Right' ] );
+$expect( $invoke( 'seat_info', '6B', 'Regional jet', 'AC|DF' ), [ 'position' => 'Unknown', 'side' => 'Unknown' ] );
+$expect( $invoke( 'seat_info', '11E', 'Regional jet', 'AB|DEF' ), [ 'position' => 'Middle', 'side' => 'Right' ] );
+$expect( $invoke( 'seat_info', '25K', 'Widebody', 'AC|DEFG|HK' ), [ 'position' => 'Window', 'side' => 'Right' ] );
+$expect( $invoke( 'seat_info', '25E', 'Widebody', 'AC|DEFG|HK' ), [ 'position' => 'Middle', 'side' => 'Center' ] );
+$expect( $invoke( 'seat_info', 'xxF', 'Regional jet', 'AC|DF' ), [ 'position' => 'Unknown', 'side' => 'Unknown' ] );
+try {
+    FlightLog\ReferenceOverrides::validate( [ 'aircraft' => [ [ 'code' => 'Test', 'seat_layout' => 'Invalid' ] ] ] );
+    throw new RuntimeException( 'Invalid seat layout accepted.' );
+} catch ( InvalidArgumentException $e ) {
+    // Expected invalid seat layout.
+}
+$reference_test_overrides = FlightLog\ReferenceOverrides::validate( [ 'aircraft' => [ [ 'code' => 'Custom aircraft', 'seat_layout' => '' ] ] ] );
+$expect( $reference_test_overrides['aircraft'], [] );
+$expect( $invoke( 'seat_layout', 'Custom aircraft', 'Custom aircraft' ), '' );
+echo "Seat layout override validation, classification, fallback and removal checks passed.\n";
+
+$expect( $invoke( 'seat_info', '25Z', 'Widebody' ), [ 'position' => 'Unknown', 'side' => 'Unknown' ] );
+$expect( $invoke( 'seat_info', '25I', 'Widebody' ), [ 'position' => 'Unknown', 'side' => 'Unknown' ] );
+$expect( $invoke( 'seat_info', '25J', 'Widebody' ), [ 'position' => 'Middle', 'side' => 'Right' ] );
+$expect( $invoke( 'seat_info', '25L', 'Widebody' ), [ 'position' => 'Window', 'side' => 'Right' ] );
+$expect( $app->automatic_seat_description( 'Widebody' ), "2–4–2: AC | DEFG | HK\n3–4–3: ABC | DEFG | HJK" );
+echo "Widebody automatic seat rules and description checks passed.\n";
+
+$expect( $app->automatic_seat_description( 'Narrowbody' ), "2–2: AC | DF\n3–3: ABC | DEF" );
+$expect( $app->automatic_seat_description( 'Regional jet' ), "2–2: AB | CD\n1–2: A | CD" );
+
+$expect( FlightLog\ReferenceOverrides::seat_map_url( 'OS', 'Embraer ERJ-195LR' ), 'https://www.aerolopa.com/os-e95' );
+$expect( FlightLog\ReferenceOverrides::seat_map_url( 'OS', 'Airbus A320-214' ), 'https://www.aerolopa.com/os-320' );
+$expect( FlightLog\ReferenceOverrides::seat_map_url( 'LH', 'Airbus A320-251N' ), 'https://www.aerolopa.com/lh-32n' );
+$expect( FlightLog\ReferenceOverrides::seat_map_url( 'BA', 'Boeing 777-336ER' ), 'https://www.aerolopa.com/ba-77w' );
+$expect( FlightLog\ReferenceOverrides::seat_map_url( 'FR', 'Boeing 737-8AS' ), 'https://www.aerolopa.com/fr-738' );
+$expect( strpos( FlightLog\ReferenceOverrides::seat_map_url( 'OS', 'Unknown aircraft' ), 'https://www.google.com/search?q=' ), 0 );
+echo "Aircraft-specific AeroLOPA links and search fallback checks passed.\n";

@@ -159,3 +159,14 @@ tbody tr.is-future td { color: #98a2b3; }
 [data-reference-section="aircraft"] .reference-table td:first-child { width: 60%; min-width: 260px; }
 [data-reference-section="aircraft"] .reference-table td:nth-child(2) { width: auto; min-width: 180px; }
 [data-reference-section="aircraft"] input { width: 100%; text-transform: none; }
+
+[data-seat-automatic-description] {
+    white-space: pre-line;
+}
+
+[data-seat-automatic-description]:not([hidden]) {
+    display: block;
+}
+
+.reference-seat-maps { display: block; margin-top: 6px; }
+.reference-seat-maps a { display: inline; margin-left: 6px; white-space: nowrap; }
