@@ -76,7 +76,13 @@ $json_flights = array_map(
     $flights
 );
 
-$render_count_list = static function( string $title, array $counts, string $filter_key, string $id = '', bool $show_heading = true, array $display_names = [] ) use ( $filter_titles, $aircraft_body_labels ): void {
+// Scale each distribution against its largest value, including collapsed rows.
+$count_bar_style = static function( $count, array $counts ): string {
+    $maximum = max( array_merge( [ 0 ], array_values( $counts ) ) );
+    return '--count-width: ' . ( $maximum > 0 ? round( 100 * $count / $maximum, 2 ) : 0 ) . '%;';
+};
+
+$render_count_list = static function( string $title, array $counts, string $filter_key, string $id = '', bool $show_heading = true, array $display_names = [] ) use ( $filter_titles, $aircraft_body_labels, $count_bar_style ): void {
     ?>
     <section class="panel summary-panel"<?php echo $id ? ' id="' . esc_attr( $id ) . '"' : ''; ?>>
         <?php if ( $show_heading ) : ?>
@@ -93,7 +99,7 @@ $render_count_list = static function( string $title, array $counts, string $filt
         <?php endif; ?>
         <div class="count-list" id="count-list-<?php echo esc_attr( $filter_key ); ?>">
             <?php foreach ( $counts as $name => $count ) : ?>
-                <button type="button" class="count-row" data-filter-label="<?php echo esc_attr( $title ); ?>" data-filter-key="<?php echo esc_attr( $filter_key ); ?>" data-filter-value="<?php echo esc_attr( $name ); ?>"<?php if ( isset( $filter_titles[ $filter_key ][ $name ] ) ) : ?> title="<?php echo esc_attr( $filter_titles[ $filter_key ][ $name ] ); ?>"<?php endif; ?>>
+                <button type="button" class="count-row" style="<?php echo esc_attr( $count_bar_style( $count, $counts ) ); ?>" data-filter-label="<?php echo esc_attr( $title ); ?>" data-filter-key="<?php echo esc_attr( $filter_key ); ?>" data-filter-value="<?php echo esc_attr( $name ); ?>"<?php if ( isset( $filter_titles[ $filter_key ][ $name ] ) ) : ?> title="<?php echo esc_attr( $filter_titles[ $filter_key ][ $name ] ); ?>"<?php endif; ?>>
                     <span><?php echo esc_html( $display_names[ $name ] ?? $name ); ?><?php if ( isset( $aircraft_body_labels[ $filter_key ][ $name ] ) ) : ?>
                         <?php
                         $layout_descriptions = [];
@@ -237,7 +243,7 @@ $render_count_list = static function( string $title, array $counts, string $filt
                     <div class="count-list country-groups" id="count-list-country">
                         <?php foreach ( $summary['countries'] as $country => $count ) : ?>
                             <details class="country-group" open>
-                                <summary class="country-heading">
+                                <summary class="country-heading" style="<?php echo esc_attr( $count_bar_style( $count, $summary['countries'] ) ); ?>">
                                     <span><?php echo esc_html( $country ); ?></span>
                                     <button type="button" class="country-filter" data-filter-label="Countries" data-filter-key="country" data-filter-value="<?php echo esc_attr( $country ); ?>" aria-label="<?php echo esc_attr( 'Filter flights by country ' . $country ); ?>" title="Filter flights by country">
                                         <?php echo esc_html( (string) $count ); ?>
@@ -245,7 +251,7 @@ $render_count_list = static function( string $title, array $counts, string $filt
                                 </summary>
                                 <div class="country-airports">
                                     <?php foreach ( $airports_by_country[ $country ] as $airport => $airport_count ) : ?>
-                                        <button type="button" class="count-row" data-filter-label="Airports" data-filter-key="airport" data-filter-value="<?php echo esc_attr( $airport ); ?>" title="<?php echo esc_attr( $country ); ?>">
+                                        <button type="button" class="count-row" style="<?php echo esc_attr( $count_bar_style( $airport_count, $summary['airports'] ) ); ?>" data-filter-label="Airports" data-filter-key="airport" data-filter-value="<?php echo esc_attr( $airport ); ?>" title="<?php echo esc_attr( $country ); ?>">
                                             <span><?php echo esc_html( $airport ); ?></span>
                                             <strong><?php echo esc_html( (string) $airport_count ); ?></strong>
                                         </button>
