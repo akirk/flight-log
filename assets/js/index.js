@@ -75,6 +75,11 @@ function matches(flight) {
     return ['date_display', 'from', 'to', 'from_airport', 'to_airport', 'route_display', 'flightnr', 'regnr', 'airline', 'aircraft', 'seat', 'remarks'].some((key) => text(flight[key]).toLowerCase().includes(q));
 }
 
+function applyFilter(key, value, label) {
+    activeFilter = {key, value, label};
+    renderRows();
+}
+
 function renderRows() {
     rows.replaceChildren();
     flights.filter(matches).forEach((flight) => {
@@ -94,7 +99,18 @@ function renderRows() {
         ].forEach(([key, className]) => {
             const td = document.createElement('td');
             td.className = className;
-            appendProviderLink(td, flight[key], (flight.provider_links || {})[key]);
+            if ((key === 'from' || key === 'to') && flight[key]) {
+                const airport = document.createElement('button');
+                airport.type = 'button';
+                airport.className = 'airport-filter';
+                airport.textContent = text(flight[key]);
+                airport.title = text(flight[`${key}_airport`] || flight[key]);
+                airport.setAttribute('aria-label', `Filter flights by airport ${text(flight[key])}`);
+                airport.addEventListener('click', () => applyFilter('airport', text(flight[`${key}_airport`] || flight[key]), 'Airports'));
+                td.append(airport);
+            } else {
+                appendProviderLink(td, flight[key], (flight.provider_links || {})[key]);
+            }
             tr.append(td);
         });
         const action = document.createElement('td');
@@ -138,12 +154,18 @@ airportFilterOpen.addEventListener('click', () => {
 });
 document.querySelectorAll('[data-filter-key]').forEach((button) => {
     button.addEventListener('click', () => {
-        activeFilter = {
-            key: button.dataset.filterKey,
-            value: button.dataset.filterValue,
-            label: button.closest('.summary-panel').querySelector('h2').textContent
-        };
-        renderRows();
+        applyFilter(button.dataset.filterKey, button.dataset.filterValue, button.dataset.filterLabel);
+    });
+});
+document.querySelectorAll('.count-list-toggle').forEach((button) => {
+    const list = document.getElementById(button.getAttribute('aria-controls'));
+    const hint = button.querySelector('.count-list-hint');
+    const collapsedHint = hint.textContent;
+    button.addEventListener('click', () => {
+        const expanded = button.getAttribute('aria-expanded') !== 'true';
+        button.setAttribute('aria-expanded', String(expanded));
+        list.classList.toggle('is-expanded', expanded);
+        hint.textContent = expanded ? 'Show top 12' : collapsedHint;
     });
 });
 document.getElementById('clear-filter').addEventListener('click', () => {
