@@ -125,7 +125,39 @@ function matches(flight) {
 
 function applyFilter(key, value, label) {
     activeFilter = {key, value, label};
+    updateFilterHistory();
     showFilterPanel(key);
+    renderRows();
+}
+
+function updateFilterHistory(method = 'pushState') {
+    const url = new URL(window.location.href);
+    if (activeFilter) {
+        url.searchParams.set('filter', activeFilter.key);
+        url.searchParams.set('value', activeFilter.value);
+    } else {
+        url.searchParams.delete('filter');
+        url.searchParams.delete('value');
+    }
+    if (search.value) url.searchParams.set('q', search.value);
+    else url.searchParams.delete('q');
+    if (url.href !== window.location.href) window.history[method](window.history.state, '', url);
+}
+
+function restoreFiltersFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const labels = {
+        airport: 'Airports', country: 'Countries', airline: 'Airlines', airline_code: 'Airline code',
+        aircraft: 'Aircraft', manufacturer: 'Manufacturers', aircraft_family: 'Aircraft families',
+        aircraft_type: 'Aircraft types', body_type: 'Body types', route_display: 'Routes',
+        route_key: 'Legs', seat_position: 'Seat position', seat_side: 'Seat side', year: 'Years'
+    };
+    const key = params.get('filter');
+    activeFilter = Object.hasOwn(labels, key) && params.has('value')
+        ? {key, value: params.get('value'), label: labels[key]} : null;
+    search.value = params.get('q') || '';
+    restoreFilterPanel();
+    if (activeFilter) showFilterPanel(activeFilter.key);
     renderRows();
 }
 
@@ -260,17 +292,15 @@ document.getElementById('clear-filter').addEventListener('click', () => {
     activeFilter = null;
     restoreFilterPanel();
     search.value = '';
+    updateFilterHistory();
     renderRows();
 });
-search.addEventListener('input', renderRows);
-const initialFilter = new URLSearchParams(window.location.search);
-const initialFilterLabels = {airport: 'Airports', airline_code: 'Airline code', aircraft: 'Aircraft', body_type: 'Body types'};
-const initialFilterKey = initialFilter.get('filter');
-if (Object.hasOwn(initialFilterLabels, initialFilterKey) && initialFilter.has('value')) {
-    applyFilter(initialFilterKey, initialFilter.get('value'), initialFilterLabels[initialFilterKey]);
-} else {
+search.addEventListener('input', () => {
+    updateFilterHistory('replaceState');
     renderRows();
-}
+});
+window.addEventListener('popstate', restoreFiltersFromUrl);
+restoreFiltersFromUrl();
 
 (function() {
     const sortFlights = () => {
