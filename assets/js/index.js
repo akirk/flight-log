@@ -6,8 +6,6 @@ const activeFilterLabel = document.getElementById('active-filter');
 const form = document.getElementById('flight-form');
 const toggle = document.getElementById('add-flight-toggle');
 const filterPanel = document.getElementById('filter-panel');
-const airportFilterOpen = document.getElementById('airport-filter-open');
-const airportFilterPanel = document.getElementById('airport-filter-panel');
 const fields = ['date', 'flightnr', 'from', 'to', 'route', 'regnr', 'aircraft', 'seat', 'first_flight', 'msn', 'remarks'];
 
 function text(value) {
@@ -108,6 +106,17 @@ function renderRows() {
                 airport.setAttribute('aria-label', `Filter flights by airport ${text(flight[key])}`);
                 airport.addEventListener('click', () => applyFilter('airport', text(flight[`${key}_airport`] || flight[key]), 'Airports'));
                 td.append(airport);
+            } else if ((key === 'airline' || key === 'aircraft') && flight[key]) {
+                const filter = document.createElement('button');
+                const filterKey = key === 'aircraft' ? 'aircraft_type' : 'airline';
+                const filterValue = text(flight[filterKey]);
+                const label = key === 'aircraft' ? 'Aircraft types' : 'Airlines';
+                filter.type = 'button';
+                filter.className = 'table-filter';
+                filter.textContent = text(flight[key]);
+                filter.setAttribute('aria-label', `Filter flights by ${key === 'aircraft' ? 'aircraft type' : 'airline'} ${filterValue}`);
+                filter.addEventListener('click', () => applyFilter(filterKey, filterValue, label));
+                td.append(filter);
             } else {
                 appendProviderLink(td, flight[key], (flight.provider_links || {})[key]);
             }
@@ -142,9 +151,11 @@ document.getElementById('flight-delete').addEventListener('click', (event) => {
     }
     document.getElementById('flight_action').value = 'delete_flight';
 });
-airportFilterOpen.addEventListener('click', () => {
-    filterPanel.open = true;
-    airportFilterPanel.scrollIntoView({block: 'nearest', behavior: 'smooth'});
+['airport', 'aircraft'].forEach((filter) => {
+    document.getElementById(`${filter}-filter-open`).addEventListener('click', () => {
+        filterPanel.open = true;
+        document.getElementById(`${filter}-filter-panel`).scrollIntoView({block: 'nearest', behavior: 'smooth'});
+    });
 });
 
 ['flightnr', 'from', 'to', 'route', 'regnr', 'seat'].forEach((id) => {
