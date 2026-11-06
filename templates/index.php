@@ -136,7 +136,7 @@ $render_count_list = static function( string $title, array $counts, string $filt
         <div class="stat"><span>Logged flights</span><strong><?php echo esc_html( (string) $summary['logged'] ); ?></strong></div>
         <button type="button" class="stat stat-button" id="airport-filter-open"><span>Airports</span><strong><?php echo esc_html( (string) count( $summary['airports'] ) ); ?></strong></button>
         <div class="stat"><span>Routes</span><strong><?php echo esc_html( (string) count( $summary['routes'] ) ); ?></strong></div>
-        <div class="stat"><span>Aircraft</span><strong><?php echo esc_html( (string) count( $summary['aircraft'] ) ); ?></strong></div>
+        <button type="button" class="stat stat-button" id="aircraft-filter-open"><span>Aircraft</span><strong><?php echo esc_html( (string) count( $summary['aircraft'] ) ); ?></strong></button>
     </section>
 
     <div class="toolbar">
@@ -151,7 +151,7 @@ $render_count_list = static function( string $title, array $counts, string $filt
             <?php $render_count_list( 'Airlines', $summary['airlines'], 'airline' ); ?>
             <?php $render_count_list( 'Airports', $summary['airports'], 'airport', 'airport-filter-panel' ); ?>
             <?php $render_count_list( 'Routes', $summary['routes'], 'route_key' ); ?>
-            <?php $render_count_list( 'Aircraft types', $summary['types'], 'aircraft_type' ); ?>
+            <?php $render_count_list( 'Aircraft types', $summary['types'], 'aircraft_type', 'aircraft-filter-panel' ); ?>
             <?php $render_count_list( 'Body types', $summary['body_types'], 'body_type' ); ?>
             <?php $render_count_list( 'Years', $summary['years'], 'year' ); ?>
         </section>
