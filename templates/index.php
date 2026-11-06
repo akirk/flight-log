@@ -142,8 +142,8 @@ $render_count_list = static function( string $title, array $counts, string $filt
             <div class="field field-remarks"><label for="remarks">Remarks</label><textarea id="remarks" name="remarks"><?php echo esc_textarea( $values['remarks'] ); ?></textarea></div>
         </div>
         <div class="form-actions">
-            <button type="submit" class="button danger<?php echo 'edit' === $form['mode'] ? '' : ' hidden-action'; ?>" id="flight-delete" formnovalidate>Delete flight</button>
             <button type="submit" class="button" id="flight-submit"><?php echo esc_html( 'edit' === $form['mode'] ? 'Save changes' : 'Add flight' ); ?></button>
+            <button type="submit" class="button danger<?php echo 'edit' === $form['mode'] ? '' : ' hidden-action'; ?>" id="flight-delete" formnovalidate>Delete flight</button>
         </div>
     </form>
 
