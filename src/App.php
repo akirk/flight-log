@@ -956,6 +956,7 @@ class App extends BaseApp {
             'date_display'   => $date->format( 'Y-m-d H:i' ),
             'date_local'     => str_replace( ' ', 'T', substr( $values['date'], 0, 19 ) ),
             'date_obj'       => $date,
+            'is_future'      => $date > new DateTime(),
             'year'           => $date->format( 'Y' ),
             'route_key'      => $values['from'] . '-' . $values['to'],
             'route_display'  => $route,
