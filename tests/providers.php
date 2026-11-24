@@ -40,7 +40,9 @@ foreach ( [ 'OS00184' => 'AUA184', 'U20012' => 'EZY12', 'AUA0012' => 'AUA12' ] a
 expect_provider( Providers::links( [ 'flightnr' => 'ZZ0012' ] )['flightnr']['url'], '' );
 expect_provider( Providers::links( [ 'flightnr' => 'XY0012' ] )['flightnr']['url'], 'https://www.flightaware.com/live/flight/XYZ12' );
 $provider_test_settings = [ 'flightnr' => 'none', 'regnr' => 'none' ];
-expect_provider( Providers::links( [ 'flightnr' => 'OS12', 'regnr' => 'OE-LZQ' ] )['flightnr']['url'], '' );
+$links = Providers::links( [ 'flightnr' => 'OS12', 'regnr' => 'OE-LZQ' ] );
+expect_provider( $links['flightnr']['url'], '' );
+expect_provider( $links['regnr']['url'], '' );
 $provider_test_settings = [ 'regnr' => 'airfleets' ];
 expect_provider( Providers::links( [ 'regnr' => 'A/?#' ] )['regnr']['url'], 'https://www.airfleets.net/recherche/?key=a%2F%3F%23' );
 echo "PASS provider defaults, validation, user preferences, URL normalization, ICAO conversion, disabled links, missing codes and encoding.\n";

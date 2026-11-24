@@ -1,0 +1,33 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  standalone:
+    name: Standalone PHP regressions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          tools: composer
+          coverage: none
+      - run: composer install --no-dev --no-interaction --prefer-dist --no-progress
+      - name: Run all standalone checks
+        run: |
+          php tests/aircraft-age.php
+          php tests/aircraft-grouping.php
+          php tests/airport-countries.php
+          php tests/providers.php
