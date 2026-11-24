@@ -48,7 +48,7 @@ class Providers {
         $links = array_fill_keys( [ 'flightnr', 'regnr' ], [ 'url' => '', 'provider' => '' ] );
         foreach ( self::settings() as $key => $provider ) {
             $identifier = strtoupper( preg_replace( '/\s+/', '', (string) ( $flight[ $key ] ?? '' ) ) );
-            if ( '' === $identifier || ( 'flightnr' === $key && 'none' === $provider ) ) {
+            if ( '' === $identifier || 'none' === $provider ) {
                 continue;
             }
             if ( 'flightnr' === $key ) {
